@@ -180,7 +180,7 @@ html { scroll-behavior: smooth; }
   font-size: 3rem;
   font-weight: 700;
   margin-bottom: 1.2rem;
-  animation: fadeInDown 1.2s ease-out;
+  animation: fadeIndown 1.5s ease-out;
 }
 .highlight { color: #ffcc00; text-shadow: 0px 2px 8px rgba(0,0,0,0.6); }
 .subtitle {
@@ -226,6 +226,7 @@ html { scroll-behavior: smooth; }
   padding: 90px 20px;
   text-align: center;
   overflow: hidden;
+  
 }
 .testimonial-slider {
   display: flex;
@@ -235,6 +236,7 @@ html { scroll-behavior: smooth; }
   gap: 30px;
   margin-top: 50px;
   animation: slideIn 1.5s ease;
+  color: aquamarine;
 }
 .testimonial-card {
   background: #f8fafc;
@@ -246,8 +248,8 @@ html { scroll-behavior: smooth; }
   position: relative;
 }
 .testimonial-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-50px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.15);
 }
 .quote {
   font-size: 3rem;

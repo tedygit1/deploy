@@ -3,18 +3,21 @@
     <div class="footer-content">
       <!-- ===== Brand Info ===== -->
       <div class="footer-section brand">
-        <h2 class="logo">CS Platform</h2>
+        <h2 class="logo">Infinity-Booking</h2>
         <p class="desc">
           Connecting customers and trusted service providers worldwide —
           discover professionals for every need, anywhere.
         </p>
         <div class="social-icons">
-          <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-          <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-          <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
-        </div>
-      </div>
+  <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+  <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+  <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+  <a href="https://www.linkedin.com/in/tedros-welu-126b77378" 
+     target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+    <i class="fab fa-linkedin-in"></i>
+  </a>
+</div>
+</div>
 
       <!-- ===== Quick Links ===== -->
       <div class="footer-section links">
@@ -31,10 +34,10 @@
       <div class="footer-section support">
         <h3>Support</h3>
         <ul>
-          <li><a href="#">Help Center</a></li>
-          <li><a href="#">Privacy Policy</a></li>
-          <li><a href="#">Terms of Service</a></li>
-          <li><a href="#">Feedback</a></li>
+          <li><router-link to="/help-center">Help Center</router-link></li>
+          <li><router-link to="/privacy-policy">Privacy Policy</router-link></li>
+          <li><router-link to="/terms-of-service">Terms of Service</router-link></li>
+          <li><router-link to="/feedback">Feedback</router-link></li>
         </ul>
       </div>
 
@@ -51,7 +54,7 @@
 
     <!-- ===== Bottom Copyright ===== -->
     <div class="footer-bottom">
-      <p>© {{ currentYear }} <strong>CS Platform</strong>. All rights reserved.</p>
+      <p>© {{ currentYear }} <strong>Infinity-Booking</strong>. All rights reserved.</p>
       <button class="scroll-top" @click="scrollToTop" title="Back to top">
         <i class="fas fa-arrow-up"></i>
       </button>
@@ -130,12 +133,14 @@ export default {
 .footer-section li {
   margin-bottom: 8px;
 }
-.footer-section a {
+.footer-section a,
+.footer-section router-link {
   color: #ccc;
   text-decoration: none;
   transition: color 0.3s ease;
 }
-.footer-section a:hover {
+.footer-section a:hover,
+.footer-section router-link:hover {
   color: #ffcc00;
 }
 

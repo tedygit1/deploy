@@ -1,81 +1,60 @@
 <template>
   <div class="auth-page">
-    <div class="auth-container">
-      <!-- Logo -->
-      <h1 class="title">Infinity-Booking</h1>
-
-      <!-- Tab Buttons -->
-      <div class="tabs">
-        <button
-          :class="{ active: activeTab === 'login' }"
-          @click="activeTab = 'login'"
-        >
-          Login
-        </button>
-        <button
-          :class="{ active: activeTab === 'signup' }"
-          @click="activeTab = 'signup'"
-        >
-          Sign Up
-        </button>
+    <!-- Left Side Visual Section -->
+    <div class="auth-image">
+      <div class="overlay"></div>
+      <img
+        src="@/assets/provider-login-illustration.png"
+        alt="Provider Illustration"
+        class="floating-image"
+      />
+      <div class="image-text">
+        <h2>Hey Beloved Provider</h2>
+        <p>Login to manage your bookings, grow your services, and connect with clients.</p>
+        <div class="motivations">
+          <p><i class="fas fa-calendar-check"></i> Schedule your work hours easily</p>
+          <p><i class="fas fa-users"></i> Reach hundreds of new customers</p>
+          <p><i class="fas fa-bolt"></i> Boost your business productivity</p>
+        </div>
       </div>
+    </div>
 
-      <!-- Login Form -->
-      <form v-if="activeTab === 'login'" class="form" @submit.prevent="handleLogin">
-        <input v-model="login.email" type="email" placeholder="Email" required />
-        <input v-model="login.password" type="password" placeholder="Password" required />
-        <button type="submit" class="btn">Login</button>
+    <!-- Login Card -->
+    <div class="auth-container">
+      <h1 class="title">Provider Login</h1>
+
+      <form class="form" @submit.prevent="handleLogin">
+        <input v-model="loginEmail" type="email" placeholder="Email" required />
+
+        <div class="password-field">
+          <input
+            :type="showPassword ? 'text' : 'password'"
+            v-model="loginPassword"
+            placeholder="Password"
+            required
+          />
+          <span class="toggle-password" @click="showPassword = !showPassword">
+            <i v-if="showPassword" class="fa fa-eye-slash"></i>
+            <i v-else class="fa fa-eye"></i>
+          </span>
+        </div>
+
+        <div class="forgot-password">
+          <span @click="goToForgotPassword">Forgot Password?</span>
+        </div>
+
+        <button type="submit" class="btn" :disabled="loginLoading">
+          {{ loginLoading ? "Logging in..." : "Login" }}
+        </button>
+
         <p class="switch-text">
           Don’t have an account?
-          <span @click="activeTab = 'signup'">Sign Up</span>
+          <span @click="goToRegister" style="font-size: 20px;">Register</span>
         </p>
-      </form>
 
-      <!-- Sign Up Form -->
-      <form v-else class="form" @submit.prevent="handleSignup" enctype="multipart/form-data">
-        <input v-model="signup.fullName" type="text" placeholder="Full Name" required />
-        <input v-model="signup.email" type="email" placeholder="Email" required />
-        <input v-model="signup.phone" type="tel" placeholder="Phone Number" required />
-        <select v-model="signup.category" required>
-          <option value="" disabled>Select Service Category</option>
-          <option>home services</option>
-          <option>beauty and salon</option>
-          <option>education and tutoring</option>
-          <option>Other</option>
-        </select>
-        <textarea
-          v-model="signup.experience"
-          placeholder="Your experience (e.g. 3)"
-          rows="2"
-          required
-        ></textarea>
-        <textarea
-          v-model="signup.reason"
-          placeholder="Your idea / why you want to register on Infinity-Booking"
-          rows="2"
-        ></textarea>
-        <input v-model="signup.password" type="password" placeholder="Password" required />
-        <input
-          v-model="signup.confirm"
-          type="password"
-          placeholder="Confirm Password"
-          required
-        />
-        <div class="file-upload">
-          <label style="display:block; text-align:left; margin-bottom:6px;">Profile Image </label>
-          <input @change="onFileChange" type="file" accept="image/*"/>
+        <div v-if="loginError" style="color:red; margin-top:8px;">
+          ❌ {{ loginError }}
         </div>
-        <input v-model="signup.nationalId" type="text" placeholder="National ID" />
-        <input v-model="signup.city" type="text" placeholder="your location" required/>
-        <label class="terms" style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
-          <input v-model="signup.accept" type="checkbox" required />
-          I agree to the Terms & Conditions and Privacy Policy.
-        </label>
-        <button type="submit" class="btn">Create Account</button>
-        <p class="switch-text">
-          Already have an account?
-          <span @click="activeTab = 'login'">Login</span>
-        </p>
       </form>
     </div>
   </div>
@@ -84,212 +63,301 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import axios from "axios";
 
 const router = useRouter();
-const activeTab = ref("login");
 
-/* login model */
-const login = ref({ email: "", password: "" });
+// Login state
+const loginEmail = ref("");
+const loginPassword = ref("");
+const showPassword = ref(false);
+const loginLoading = ref(false);
+const loginError = ref(null);
 
-/* signup model */
-const signup = ref({
-  fullName: "",
-  email: "",
-  phone: "",
-  category: "",
-  experience: "",
-  reason: "",
-  password: "",
-  confirm: "",
-  accept: false,
-  nationalId: "",
-  city: "",
-  profileFile: null
-});
+// ✅ Fixed: Correct base URL (no trailing spaces)
+const BASE_URL = "https://infinity-booking-backend1.onrender.com/infinity-booking";
 
-// ✅ Helpers to store users
-function getUsers() {
-  return JSON.parse(localStorage.getItem("providers") || "[]");
-}
+async function handleLogin() {
+  loginLoading.value = true;
+  loginError.value = null;
 
-function saveUsers(users) {
-  localStorage.setItem("providers", JSON.stringify(users));
-}
-
-/* handlers */
-function handleLogin() {
-  if (!login.value.email || !login.value.password) {
-    alert("Please enter email and password");
+  if (!loginEmail.value || !loginPassword.value) {
+    loginError.value = "Email and password are required";
+    loginLoading.value = false;
     return;
   }
 
-  const users = getUsers();
-  const user = users.find(
-    u => u.email === login.value.email && u.password === login.value.password
-  );
+  try {
+    // ✅ Send login request
+    const res = await axios.post(`${BASE_URL}/auth/login`, {
+      email: loginEmail.value.trim(),
+      password: loginPassword.value,
+    });
 
-  if (!user) {
-    alert("Invalid email or password");
-    return;
+    const token = res.data?.token;
+    const user = res.data?.user || res.data;
+
+    // ✅ CRITICAL FIX: Validate and save provider_id
+    if (!token || !user?._id) {
+      throw new Error("Invalid login response: missing token or user ID");
+    }
+
+    // ✅ Save ALL required auth data
+    localStorage.setItem("provider_token", token);
+    localStorage.setItem("provider_id", user._id); // 🔑 THIS WAS MISSING!
+    localStorage.setItem("loggedProvider", JSON.stringify(user));
+
+    const fullname = user?.fullname || "Provider";
+    alert(`✅ Welcome back, ${fullname}!`);
+
+    router.push({ name: "ProviderHome" });
+
+  } catch (err) {
+    console.error("❌ Login error:", err.response?.data || err.message);
+    loginError.value = err.response?.data?.message || "Login failed. Please try again.";
+  } finally {
+    loginLoading.value = false;
   }
-
-  localStorage.setItem("token", "provider_token");
-  localStorage.setItem("currentUser", JSON.stringify({ email: user.email, fullName: user.fullName }));
-
-  router.push({ name: "ProviderDashboard" });
 }
 
-function handleSignup() {
-  if (!signup.value.fullName.trim()) { alert("Full name is required"); return; }
-  if (!signup.value.email) { alert("Email is required"); return; }
-  if (!signup.value.phone) { alert("Phone number is required"); return; }
-  if (!signup.value.category) { alert("Please select a service category"); return; }
-  if (!signup.value.experience) { alert("Please provide your experience"); return; }
-  if (!signup.value.password || !signup.value.confirm) { alert("Password and confirm password are required"); return; }
-  if (signup.value.password !== signup.value.confirm) { alert("Passwords do not match"); return; }
-  if (!signup.value.profileFile) { alert("Please upload a profile image"); return; }
-  if (!signup.value.accept) { alert("You must accept the Terms & Conditions"); return; }
-
-  const users = getUsers();
-
-  if (users.some(u => u.email === signup.value.email)) {
-    alert("Email already registered");
-    return;
-  }
-
-  const newUser = {
-    fullName: signup.value.fullName,
-    email: signup.value.email,
-    phone: signup.value.phone,
-    category: signup.value.category,
-    experience: signup.value.experience,
-    reason: signup.value.reason,
-    nationalId: signup.value.nationalId,
-    city: signup.value.city,
-    password: signup.value.password
-  };
-
-  users.push(newUser);
-  saveUsers(users);
-
-  // ✅ Switch to login after signup and prefill email
-  alert("Signup successful! Please login now.");
-  activeTab.value = "login";   // Switch tab
-  login.value.email = signup.value.email; // Prefill email
-  login.value.password = "";   // Clear password for security
+function goToRegister() {
+  router.push("/register");
 }
 
-/* file change */
-function onFileChange(e) {
-  const f = e.target.files && e.target.files[0];
-  signup.value.profileFile = f || null;
+function goToForgotPassword() {
+  router.push("/forgot-password");
 }
 </script>
 
 <style scoped>
+/* ====== Same styles as before ====== */
 .auth-page {
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
   min-height: 100vh;
-  padding: 4rem 1rem 2rem;
-  overflow-y: auto;
-  background: linear-gradient(135deg, #0077ff, #00c9a7);
+  background: linear-gradient(135deg, #93c5fd, #a7f3d0);
   font-family: "Poppins", sans-serif;
+  padding: 2rem;
+  overflow: hidden;
+}
+
+.auth-image {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 25px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  height: 500px;
+}
+
+.auth-image img {
+  width: 100%;
+  max-width: 550px;
+  border-radius: 25px;
+  object-fit: cover;
+  z-index: 2;
+  opacity: 0.95;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.5),
+    rgba(16, 185, 129, 0.5)
+  );
+  z-index: 1;
+}
+
+.image-text {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  text-align: center;
+  z-index: 3;
+  max-width: 85%;
+}
+
+.image-text h2 {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.image-text p {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-top: 0.5rem;
+}
+
+.motivations {
+  margin-top: 1.2rem;
+  text-align: left;
+}
+
+.motivations p {
+  font-size: 0.95rem;
+  color: #f0fdf4;
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.motivations i {
+  color: #ffcc00;
+}
+
+.floating-image {
+  animation: float 5s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .auth-container {
+  flex: 1;
+  max-width: 420px;
   background: white;
   padding: 2.5rem;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 400px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  margin-left: 3rem;
   text-align: center;
 }
 
 .title {
-  color: #0077ff;
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 700;
-  margin-bottom: 1.5rem;
-}
-
-.tabs {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 1.5rem;
-}
-
-.tabs button {
-  flex: 1;
-  padding: 0.7rem 0;
-  font-size: 1rem;
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  transition: all 0.3s ease;
-}
-
-.tabs button.active {
-  color: #0077ff;
-  font-weight: 600;
-  border-color: #0077ff;
+  margin-bottom: 2rem;
+  color: #2563eb;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
-.form input,
-.form select,
-.form textarea {
-  padding: 0.8rem;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
-
-.form input:focus,
-.form select:focus,
-.form textarea:focus {
-  border-color: #0077ff;
+input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 15px;
   outline: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.4);
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 42px;
+  box-sizing: border-box;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.forgot-password {
+  text-align: right;
+  font-size: 0.9rem;
+  color: #2563eb;
+  cursor: pointer;
+  margin-top: -0.5rem;
+}
+
+.forgot-password span:hover {
+  text-decoration: underline;
 }
 
 .btn {
-  background: #0077ff;
-  color: white;
-  padding: 0.8rem;
+  padding: 14px;
   border: none;
-  border-radius: 10px;
-  font-size: 1rem;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.3s ease;
+  font-size: 16px;
+  transition: all 0.3s ease;
 }
 
 .btn:hover {
-  background: #005fd1;
+  background: #1d4ed8;
 }
 
 .switch-text {
-  margin-top: 0.8rem;
-  font-size: 0.9rem;
-  color: #555;
+  margin-top: 1rem;
+  font-size: 14px;
+  color: #374151;
 }
 
 .switch-text span {
-  color: #0077ff;
+  color: #2563eb;
   cursor: pointer;
   font-weight: 600;
+  margin-left: 4px;
+  transition: color 0.2s;
 }
 
-.file-upload input[type="file"] {
-  padding: 0.25rem 0;
+.switch-text span:hover {
+  color: #1d4ed8;
+}
+
+@media (max-width: 900px) {
+  .auth-page {
+    flex-direction: column;
+    padding: 2rem 1rem;
+  }
+
+  .auth-image {
+    order: 2;
+    margin-top: 2rem;
+    width: 100%;
+    height: 250px;
+  }
+
+  .auth-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .auth-container {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 </style>
