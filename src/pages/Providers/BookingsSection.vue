@@ -437,6 +437,8 @@
   </div>
 </template>
 
+
+
 <script>
 import { ref, computed, onMounted } from "vue";
 import http from "@/api/index.js";
@@ -460,9 +462,6 @@ export default {
     const selectedBooking = ref(null);
     const currentProviderId = ref("");
     const currentEndpoint = ref("");
-
-    // User details cache
-    const userDetailsCache = ref(new Map());
 
     // Statistics
     const stats = ref({
@@ -522,36 +521,113 @@ export default {
       }
     };
 
-    // SIMPLE: Extract customer data directly from booking
-    const extractCustomerDataFromBooking = (booking) => {
-      console.log("🔍 RAW BOOKING DATA:", booking);
+    // SMART CUSTOMER DATA EXTRACTION: Handle admin bookings and real customer bookings
+    const extractCustomerData = (booking) => {
+      console.log("🎯 EXTRACTING CUSTOMER DATA FROM BOOKING:", booking._id);
       
-      // Try every possible location for customer data
-      const customer = booking.customer || {};
-      const user = booking.user || {};
+      // Check if this is an admin-created booking (no customer data)
+      const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
       
-      // Check if we have customer ID
-      const customerId = 
-        booking.customerId || 
-        customer._id || 
-        booking.userId || 
-        user._id;
+      if (isAdminBooking) {
+        console.log("👨‍💼 ADMIN BOOKING DETECTED - No customer data available");
+        return {
+          customerId: null,
+          fullname: 'Walk-in Customer',
+          email: 'No email provided',
+          phone: 'Contact for details',
+          location: 'In-store booking',
+          isAdminBooking: true
+        };
+      }
       
-      console.log("🎯 Customer ID found:", customerId);
+      // Check for customer object (standard customer booking)
+      if (booking.customer && typeof booking.customer === 'object') {
+        console.log("✅ Found customer object in booking");
+        return {
+          customerId: booking.customer._id || booking.customer.id,
+          fullname: booking.customer.fullname || booking.customer.name || 'Customer',
+          email: booking.customer.email || 'No email provided',
+          phone: booking.customer.phone || 'Contact for details',
+          location: booking.customer.location || booking.customer.address || '',
+          isAdminBooking: false
+        };
+      }
       
-      const customerData = {
-        customerId: customerId,
-        fullname: customer.fullname || customer.name || user.fullname || user.name || booking.customerName || 'Unknown Customer',
-        email: customer.email || user.email || booking.customerEmail || 'No email',
-        phone: customer.phone || user.phone || booking.customerPhone || '',
-        location: customer.location || user.location || customer.address || user.address || booking.customerLocation || ''
+      // Check for direct customer fields
+      if (booking.customerName || booking.customerEmail) {
+        console.log("✅ Found direct customer fields");
+        return {
+          customerId: booking.customerId || booking.userId,
+          fullname: booking.customerName || 'Customer',
+          email: booking.customerEmail || 'No email provided',
+          phone: booking.customerPhone || 'Contact for details',
+          location: booking.customerLocation || '',
+          isAdminBooking: false
+        };
+      }
+      
+      // Check for user object (alternative naming)
+      if (booking.user && typeof booking.user === 'object') {
+        console.log("✅ Found user object");
+        return {
+          customerId: booking.user._id || booking.user.id,
+          fullname: booking.user.fullname || booking.user.name || 'Customer',
+          email: booking.user.email || 'No email provided',
+          phone: booking.user.phone || 'Contact for details',
+          location: booking.user.location || booking.user.address || '',
+          isAdminBooking: false
+        };
+      }
+      
+      // If no customer data found at all
+      console.log("❌ NO CUSTOMER DATA FOUND - Using default values");
+      return {
+        customerId: null,
+        fullname: 'Walk-in Customer',
+        email: 'No email provided',
+        phone: 'Contact for details',
+        location: 'In-store booking',
+        isAdminBooking: true
       };
-
-      console.log("✅ Extracted customer data:", customerData);
-      return customerData;
     };
 
-    // SIMPLE: Process bookings without external API calls
+    // ENHANCE BOOKING DISPLAY: Make admin bookings look better
+    const enhanceBookingDisplay = (booking, customerData) => {
+      const service = booking.service || {};
+      
+      const enhancedBooking = {
+        _id: booking._id || booking.bookingId || booking.id,
+        customerId: customerData.customerId,
+        providerId: booking.providerId || booking.provider?._id,
+        customerName: customerData.fullname,
+        customerEmail: customerData.email,
+        customerPhone: customerData.phone,
+        customerLocation: customerData.location,
+        isAdminBooking: customerData.isAdminBooking,
+        serviceName: service.title || service.name || booking.serviceName || 'Unknown Service',
+        serviceCategory: service.categoryName || service.category || booking.serviceCategory || 'General',
+        bookingDate: booking.bookingDate || booking.date || booking.appointmentDate,
+        startTime: booking.startTime || booking.time,
+        endTime: booking.endTime,
+        duration: booking.duration,
+        status: (booking.status || 'pending').toLowerCase(),
+        amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
+        createdAt: booking.createdAt || booking.bookingTime,
+        notes: booking.notes || booking.specialRequirements,
+        originalData: booking
+      };
+
+      // Add admin booking badge to notes for display
+      if (customerData.isAdminBooking) {
+        enhancedBooking.notes = enhancedBooking.notes 
+          ? `${enhancedBooking.notes} • Admin Booking`
+          : 'Admin Booking';
+      }
+
+      return enhancedBooking;
+    };
+
+    // PROCESS BOOKINGS: Convert API response to our format
     const processBookings = (apiBookings) => {
       if (!apiBookings) {
         console.warn("⚠️ No data received from API");
@@ -574,42 +650,22 @@ export default {
 
       console.log(`📊 Processing ${bookingsArray.length} bookings...`);
 
-      // Process booking data with direct customer extraction
+      // Process each booking
       const processedBookings = bookingsArray.map(booking => {
-        const customerData = extractCustomerDataFromBooking(booking);
-        const service = booking.service || {};
-        
-        // Store customer data in cache
-        if (customerData.customerId) {
-          userDetailsCache.value.set(customerData.customerId, customerData);
-        }
-
-        return {
-          _id: booking._id || booking.bookingId || booking.id,
-          customerId: customerData.customerId,
-          providerId: booking.providerId || booking.provider?._id,
-          customerName: customerData.fullname,
-          customerEmail: customerData.email,
-          customerPhone: customerData.phone,
-          customerLocation: customerData.location,
-          serviceName: service.title || service.name || booking.serviceName || 'Unknown Service',
-          serviceCategory: service.categoryName || service.category || booking.serviceCategory || 'General',
-          bookingDate: booking.bookingDate || booking.date || booking.appointmentDate,
-          startTime: booking.startTime || booking.time,
-          endTime: booking.endTime,
-          duration: booking.duration,
-          status: (booking.status || 'pending').toLowerCase(),
-          amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
-          createdAt: booking.createdAt || booking.bookingTime,
-          notes: booking.notes || booking.specialRequirements,
-          originalData: booking
-        };
+        const customerData = extractCustomerData(booking);
+        return enhanceBookingDisplay(booking, customerData);
       });
+
+      // Count admin vs customer bookings
+      const adminBookings = processedBookings.filter(b => b.isAdminBooking).length;
+      const customerBookings = processedBookings.filter(b => !b.isAdminBooking).length;
+      
+      console.log(`📊 Booking Summary: ${adminBookings} admin bookings, ${customerBookings} customer bookings`);
 
       return processedBookings;
     };
 
-    // Load bookings data
+    // LOAD BOOKINGS: Main function to fetch and process bookings
     const loadBookings = async () => {
       const providerId = getProviderId();
       
@@ -646,18 +702,11 @@ export default {
 
         console.log("✅ API Response received:", response.data);
         
-        // Process the data with direct customer extraction
+        // Process the data
         const processedBookings = processBookings(response.data);
         bookings.value = processedBookings;
         
         console.log(`✅ Processed ${processedBookings.length} bookings`);
-        
-        // Check if we have real customer data
-        const bookingsWithRealData = processedBookings.filter(b => 
-          b.customerName !== 'Unknown Customer' && b.customerEmail !== 'No email'
-        );
-        console.log(`📊 ${bookingsWithRealData.length} bookings have real customer data`);
-        
         calculateStats();
 
       } catch (err) {
@@ -683,20 +732,32 @@ export default {
       }
     };
 
-    // Customer data getters
+    // ENHANCED CUSTOMER DATA GETTERS: Show better info for admin bookings
     const getCustomerName = (booking) => {
-      return booking.customerName || 'Unknown Customer';
+      if (booking.isAdminBooking) {
+        return 'Walk-in Customer 🏪';
+      }
+      return booking.customerName || 'Customer';
     };
 
     const getCustomerEmail = (booking) => {
-      return booking.customerEmail || 'No email';
+      if (booking.isAdminBooking) {
+        return 'In-store booking';
+      }
+      return booking.customerEmail || 'No email provided';
     };
 
     const getCustomerPhone = (booking) => {
+      if (booking.isAdminBooking) {
+        return 'Contact for details';
+      }
       return booking.customerPhone || '';
     };
 
     const getCustomerLocation = (booking) => {
+      if (booking.isAdminBooking) {
+        return 'Store location';
+      }
       return booking.customerLocation || '';
     };
 
@@ -806,6 +867,13 @@ export default {
       statusMessage += `   Total Bookings: ${stats.value.totalBookings}\n`;
       statusMessage += `   Pending: ${stats.value.pending} | Confirmed: ${stats.value.confirmed}\n`;
       statusMessage += `   Completed: ${stats.value.completed} | Revenue: $${stats.value.revenue}\n\n`;
+      
+      // Add admin booking info
+      const adminBookings = bookings.value.filter(b => b.isAdminBooking).length;
+      const customerBookings = bookings.value.filter(b => !b.isAdminBooking).length;
+      statusMessage += `📋 Booking Types:\n`;
+      statusMessage += `   Admin/Store Bookings: ${adminBookings}\n`;
+      statusMessage += `   Customer Bookings: ${customerBookings}\n\n`;
       
       if (bookings.value.length === 0) {
         statusMessage += `💡 No bookings yet. Share your services to get started!`;
@@ -935,6 +1003,8 @@ export default {
     // Utility functions
     const getInitials = (name) => {
       if (!name) return '??';
+      // For admin bookings, use store icon
+      if (name.includes('🏪')) return '🏪';
       return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     };
 
@@ -1054,6 +1124,9 @@ export default {
   }
 };
 </script>
+
+
+
 
 
 <style scoped>
