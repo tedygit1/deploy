@@ -522,24 +522,36 @@ export default {
       }
     };
 
-    // SIMPLIFIED: Direct customer data extraction from booking
+    // SIMPLE: Extract customer data directly from booking
     const extractCustomerDataFromBooking = (booking) => {
-      console.log("🔍 Extracting customer data from booking:", booking);
+      console.log("🔍 RAW BOOKING DATA:", booking);
       
-      // Try different possible paths for customer data
+      // Try every possible location for customer data
       const customer = booking.customer || {};
+      const user = booking.user || {};
+      
+      // Check if we have customer ID
+      const customerId = 
+        booking.customerId || 
+        customer._id || 
+        booking.userId || 
+        user._id;
+      
+      console.log("🎯 Customer ID found:", customerId);
+      
       const customerData = {
-        fullname: customer.fullname || customer.name || booking.customerName || 'Unknown Customer',
-        email: customer.email || booking.customerEmail || 'No email',
-        phone: customer.phone || booking.customerPhone || '',
-        location: customer.location || customer.address || booking.customerLocation || ''
+        customerId: customerId,
+        fullname: customer.fullname || customer.name || user.fullname || user.name || booking.customerName || 'Unknown Customer',
+        email: customer.email || user.email || booking.customerEmail || 'No email',
+        phone: customer.phone || user.phone || booking.customerPhone || '',
+        location: customer.location || user.location || customer.address || user.address || booking.customerLocation || ''
       };
 
       console.log("✅ Extracted customer data:", customerData);
       return customerData;
     };
 
-    // SIMPLIFIED: Process bookings with direct customer data extraction
+    // SIMPLE: Process bookings without external API calls
     const processBookings = (apiBookings) => {
       if (!apiBookings) {
         console.warn("⚠️ No data received from API");
@@ -567,14 +579,14 @@ export default {
         const customerData = extractCustomerDataFromBooking(booking);
         const service = booking.service || {};
         
-        // Store customer data in cache for this booking
-        if (booking.customerId) {
-          userDetailsCache.value.set(booking.customerId, customerData);
+        // Store customer data in cache
+        if (customerData.customerId) {
+          userDetailsCache.value.set(customerData.customerId, customerData);
         }
 
         return {
           _id: booking._id || booking.bookingId || booking.id,
-          customerId: booking.customerId || booking.customer?._id,
+          customerId: customerData.customerId,
           providerId: booking.providerId || booking.provider?._id,
           customerName: customerData.fullname,
           customerEmail: customerData.email,
@@ -639,7 +651,13 @@ export default {
         bookings.value = processedBookings;
         
         console.log(`✅ Processed ${processedBookings.length} bookings`);
-        console.log("📋 Sample booking data:", processedBookings[0]);
+        
+        // Check if we have real customer data
+        const bookingsWithRealData = processedBookings.filter(b => 
+          b.customerName !== 'Unknown Customer' && b.customerEmail !== 'No email'
+        );
+        console.log(`📊 ${bookingsWithRealData.length} bookings have real customer data`);
+        
         calculateStats();
 
       } catch (err) {
@@ -665,7 +683,7 @@ export default {
       }
     };
 
-    // SIMPLIFIED: Customer data getters
+    // Customer data getters
     const getCustomerName = (booking) => {
       return booking.customerName || 'Unknown Customer';
     };
