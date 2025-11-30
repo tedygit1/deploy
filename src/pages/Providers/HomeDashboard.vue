@@ -13,9 +13,9 @@
           </div>
         </div>
         <div class="header-actions">
-          <button class="btn btn-primary" @click="refreshData">
-            <i class="fa-solid fa-rotate"></i>
-            Refresh
+          <button class="btn btn-primary" @click="refreshData" :disabled="loading">
+            <i class="fa-solid fa-rotate" :class="{ 'fa-spin': loading }"></i>
+            {{ loading ? 'Refreshing...' : 'Refresh' }}
           </button>
           <button class="btn btn-outline" @click="generateReport">
             <i class="fa-solid fa-chart-line"></i>
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="loading-container">
+    <div v-if="loading && !hasData" class="loading-container">
       <div class="loading-content">
         <div class="spinner"></div>
         <h3>Loading Your Dashboard</h3>
@@ -34,19 +34,19 @@
       </div>
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="error-container">
+    <!-- Error State - Only show if there's a critical error and no data -->
+    <div v-else-if="criticalError && !hasData" class="error-container">
       <div class="error-content">
         <i class="fa-solid fa-exclamation-triangle"></i>
         <h3>Unable to Load Data</h3>
-        <p>{{ error }}</p>
+        <p>{{ criticalError }}</p>
         <button class="btn btn-primary" @click="loadDashboardData">
           Try Again
         </button>
       </div>
     </div>
 
-    <!-- Main Content -->
+    <!-- Main Content - Show when we have data OR when loading is complete -->
     <div v-else class="dashboard-content">
       <!-- Key Metrics Grid -->
       <div class="metrics-grid">
@@ -280,8 +280,8 @@ export default {
     
     // Reactive data
     const loading = ref(true);
-    const error = ref("");
-    const dashboardData = ref({});
+    const criticalError = ref(""); // Renamed from error to criticalError
+    const hasData = ref(false); // New flag to track if we have data
     
     // Mock data for demonstration (replace with real API calls)
     const metrics = ref([
@@ -357,13 +357,13 @@ export default {
     const loadDashboardData = async () => {
       const providerId = getProviderId();
       if (!providerId) {
-        error.value = "Please login to access dashboard";
+        criticalError.value = "Please login to access dashboard";
         loading.value = false;
         return;
       }
 
       loading.value = true;
-      error.value = "";
+      criticalError.value = "";
 
       try {
         console.log("📊 Loading dashboard data for provider:", providerId);
@@ -377,12 +377,15 @@ export default {
         // Process the data
         processDashboardData(bookingsResponse.data, statsResponse.data);
         
+        hasData.value = true;
+        
       } catch (err) {
         console.error("❌ Error loading dashboard data:", err);
         handleLoadError(err);
         
         // Load mock data for demonstration
         loadMockData();
+        hasData.value = true; // We have mock data now
       } finally {
         loading.value = false;
       }
@@ -427,6 +430,8 @@ export default {
     };
 
     const loadMockData = () => {
+      console.log("📋 Loading mock data for demonstration...");
+      
       // Mock metrics data
       const mockMetrics = [24, 19, 5, "1,250", 3, 92];
       metrics.value.forEach((metric, index) => {
@@ -570,14 +575,15 @@ export default {
 
     const handleLoadError = (err) => {
       if (err.response?.status === 401) {
-        error.value = "Session expired. Please login again.";
+        criticalError.value = "Session expired. Please login again.";
       } else if (err.response?.status === 403) {
-        error.value = "Access denied. Please check your permissions.";
+        criticalError.value = "Access denied. Please check your permissions.";
       } else if (err.response?.status === 404) {
         // API endpoints might not exist yet, use mock data
-        error.value = "";
+        console.log("📋 API endpoints not found, using mock data");
+        criticalError.value = ""; // Clear error since we'll use mock data
       } else {
-        error.value = "Unable to load dashboard data. Please try again.";
+        criticalError.value = "Unable to load dashboard data. Please try again.";
       }
     };
 
@@ -629,7 +635,8 @@ export default {
 
     return {
       loading,
-      error,
+      criticalError: criticalError, // Expose as criticalError
+      hasData,
       metrics,
       upcomingBookings,
       recentActivity,
@@ -653,6 +660,7 @@ export default {
 </script>
 
 <style scoped>
+/* Your existing CSS remains exactly the same */
 /* Enhanced Home Dashboard Styles */
 .home-dashboard {
   max-width: 1400px;

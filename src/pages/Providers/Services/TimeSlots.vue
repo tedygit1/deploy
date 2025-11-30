@@ -696,9 +696,8 @@ export default {
   }
 };
 </script>
-
 <style scoped>
-/* Keep your existing CSS exactly as it was — no changes needed */
+/* ===== BASE STYLES ===== */
 .time-slots-container {
   max-width: 1000px;
   margin: 0 auto;
@@ -706,118 +705,7 @@ export default {
   font-family: "Poppins", sans-serif;
 }
 
-/* NEW STYLES FOR BOOKED SLOTS */
-.booked-slot-content {
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
-}
-
-.booked-slot-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.booked-time {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: #dc2626;
-}
-
-.booked-icon {
-  color: #dc2626;
-}
-
-.booked-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.booked-badge {
-  background: #dc2626;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.customer-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
-  color: #7f1d1d;
-}
-
-.customer-info i {
-  font-size: 0.8rem;
-}
-
-.time-slot-item.booked-slot {
-  opacity: 0.9;
-}
-
-.btn-info {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-info:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-/* Updated styles for 7-day schedule */
-.schedule-description {
-  color: #64748b;
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-
-.schedule-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.date-range {
-  background: #e0f2fe;
-  color: #0369a1;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.day-card.today {
-  border-color: #3b82f6;
-  background: #eff6ff;
-}
-
-.today-label {
-  background: #3b82f6;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-/* Keep all your existing styles below, they work perfectly */
-.time-slots-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 20px;
-  font-family: "Poppins", sans-serif;
-}
-
+/* ===== LOADING & MESSAGE STATES ===== */
 .loading-state {
   text-align: center;
   padding: 40px 20px;
@@ -890,6 +778,7 @@ export default {
   opacity: 0.9;
 }
 
+/* ===== CONFIGURATION HEADER ===== */
 .slot-config-header {
   background: #f8fafc;
   border-radius: 8px;
@@ -900,6 +789,14 @@ export default {
 .slot-config-header h3 {
   color: #0f172a;
   margin-bottom: 8px;
+  font-size: 1.5rem;
+}
+
+.schedule-description {
+  color: #64748b;
+  margin-bottom: 16px;
+  line-height: 1.5;
+  font-size: 0.95rem;
 }
 
 .slot-config-controls {
@@ -915,6 +812,7 @@ export default {
   gap: 8px;
   font-weight: 500;
   color: #334155;
+  cursor: pointer;
 }
 
 .toggle-label {
@@ -924,17 +822,20 @@ export default {
 .slot-label-input {
   flex: 1;
   min-width: 250px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.9rem;
+  transition: all 0.2s ease;
 }
 
 .slot-label-input:focus {
   outline: none;
   border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+/* ===== WEEKLY SCHEDULE SECTION ===== */
 .weekly-schedule-section {
   background: white;
   border-radius: 12px;
@@ -943,17 +844,51 @@ export default {
   margin-bottom: 24px;
 }
 
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.schedule-header h4 {
+  color: #0f172a;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.date-range {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.section-description {
+  color: #64748b;
+  margin-bottom: 24px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+/* ===== DAYS GRID - RESPONSIVE ===== */
 .days-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
 }
 
 .day-card {
   border: 2px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
   transition: all 0.3s ease;
+  background: white;
 }
 
 .day-card.working-day {
@@ -961,95 +896,228 @@ export default {
   background: #f0fdf4;
 }
 
+.day-card.today {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.day-card.day-off {
+  background: #f8fafc;
+  opacity: 0.8;
+}
+
 .day-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .day-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-weight: 600;
   color: #334155;
   cursor: pointer;
+  flex: 1;
 }
 
 .day-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
+  border-radius: 4px;
 }
 
 .day-label {
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .off-label {
   color: #94a3b8;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 12px;
 }
 
+.today-label {
+  background: #3b82f6;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ===== TIME SLOTS LIST ===== */
 .time-slots-list {
-  space-y: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* ===== TIME SLOT ITEM - HORIZONTAL LAYOUT ===== */
 .time-slot-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
-  position: relative;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  flex-wrap: nowrap;
+  min-height: 60px;
+  box-sizing: border-box;
 }
 
-.time-slot-item.updating {
-  opacity: 0.7;
+.time-slot-item.has-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.time-slot-item.booked-slot {
+  background: #fef2f2;
+  border-color: #fecaca;
+  opacity: 0.9;
+  min-height: auto;
+  padding: 6px 10px;
+}
+
+/* ===== ULTRA COMPACT BOOKED SLOTS ===== */
+.booked-slot-content {
+  width: 100%;
+  padding: 0;
+}
+
+.booked-slot-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.booked-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #dc2626;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.booked-icon {
+  color: #dc2626;
+  font-size: 0.8rem;
+}
+
+.booked-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.booked-badge {
+  background: #dc2626;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.customer-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: #7f1d1d;
+  flex-shrink: 0;
+}
+
+.customer-info i {
+  font-size: 0.7rem;
+}
+
+/* ===== AVAILABLE SLOTS - FIXED LAYOUT ===== */
+.available-slot-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .time-inputs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
   flex: 1;
 }
 
 .time-input {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   background: white;
+  text-align: center;
+  min-width: 85px;
+  max-width: 95px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
 .time-input:focus {
   outline: none;
   border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .time-input:disabled {
   background: #f8fafc;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .time-separator {
   color: #64748b;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin: 0 2px;
 }
 
 .slot-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .availability-toggle {
   position: relative;
   display: inline-block;
-  width: 40px;
+  width: 36px;
   height: 20px;
+  flex-shrink: 0;
 }
 
 .availability-toggle input {
@@ -1080,6 +1148,7 @@ export default {
   background-color: white;
   transition: .4s;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 input:checked + .toggle-slider {
@@ -1087,7 +1156,7 @@ input:checked + .toggle-slider {
 }
 
 input:checked + .toggle-slider:before {
-  transform: translateX(20px);
+  transform: translateX(16px);
 }
 
 input:disabled + .toggle-slider {
@@ -1095,146 +1164,216 @@ input:disabled + .toggle-slider {
   cursor: not-allowed;
 }
 
-.updating-spinner {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #3b82f6;
-  font-size: 0.8rem;
-}
-
 .btn-remove-slot {
   background: #fee2e2;
   border: none;
   color: #dc2626;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .btn-remove-slot:hover:not(:disabled) {
   background: #fecaca;
+  transform: scale(1.05);
 }
 
 .btn-remove-slot:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.btn-add-slot {
-  background: #f1f5f9;
-  border: 1px dashed #cbd5e1;
-  color: #475569;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  justify-content: center;
-  transition: background 0.2s;
-}
-
-.btn-add-slot:hover {
-  background: #e2e8f0;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 16px;
-  justify-content: flex-end;
-  padding: 24px 0;
-  border-top: 1px solid #e2e8f0;
-}
-
-.btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: #22c55e;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #16a34a;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.btn-secondary:hover {
-  background: #e2e8f0;
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover {
-  background: #d97706;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.time-slot-item.has-error {
-  border: 1px solid #dc2626;
-  border-radius: 6px;
-  padding: 8px;
+  transform: none;
 }
 
 .slot-error {
   color: #dc2626;
   font-size: 0.8rem;
   margin-top: 4px;
+  text-align: center;
+  font-weight: 500;
+  width: 100%;
+  flex-basis: 100%;
 }
 
-.day-card.day-off {
+/* ===== ADD SLOT BUTTON ===== */
+.btn-add-slot {
   background: #f8fafc;
-  opacity: 0.7;
+  border: 2px dashed #cbd5e1;
+  color: #475569;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-add-slot:hover:not(:disabled) {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+.btn-add-slot:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== ACTION BUTTONS ===== */
+.action-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 24px 0;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  min-height: 48px;
+}
+
+.btn-primary {
+  background: #22c55e;
+  color: white;
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #16a34a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
+.btn-info {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.btn-info:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .primary-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ===== DEBUG INFO ===== */
+.debug-info {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.debug-info h5 {
+  margin: 0 0 8px 0;
+  color: #475569;
+}
+
+.debug-info p {
+  margin: 4px 0;
+  color: #64748b;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+  .time-slots-container {
+    padding: 16px;
+  }
+  
+  .days-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
 }
 
 @media (max-width: 768px) {
   .time-slots-container {
-    padding: 15px;
+    padding: 12px;
+  }
+  
+  .slot-config-header {
+    padding: 16px;
+  }
+  
+  .slot-config-header h3 {
+    font-size: 1.3rem;
   }
   
   .slot-config-controls {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
   }
   
   .slot-label-input {
     min-width: auto;
+    width: 100%;
+  }
+  
+  .weekly-schedule-section {
+    padding: 20px;
   }
   
   .schedule-header {
@@ -1243,27 +1382,340 @@ input:disabled + .toggle-slider {
     gap: 12px;
   }
   
-  .days-grid {
-    grid-template-columns: 1fr;
+  .schedule-header h4 {
+    font-size: 1.2rem;
   }
   
-  .primary-actions {
+  .days-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .day-card {
+    padding: 16px;
+  }
+  
+  .day-header {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .day-toggle {
+    width: 100%;
+  }
+  
+  /* MOBILE FIX: Keep available slots in one line */
+  .available-slot-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  
+  .time-inputs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .time-input {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    min-width: 70px;
+    max-width: 75px;
+    flex-shrink: 0;
+  }
+  
+  .time-separator {
+    font-size: 0.75rem;
+    margin: 0 2px;
+    flex-shrink: 0;
+  }
+  
+  .slot-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  
+  .availability-toggle {
+    width: 32px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  
+  .toggle-slider:before {
+    height: 14px;
+    width: 14px;
+  }
+  
+  input:checked + .toggle-slider:before {
+    transform: translateX(14px);
+  }
+  
+  .btn-remove-slot {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+  
+  .time-slot-item {
+    padding: 8px 10px;
+    gap: 8px;
+    min-height: auto;
+    flex-wrap: nowrap;
+  }
+  
+  /* Compact booked slots on mobile */
+  .time-slot-item.booked-slot {
+    padding: 5px 8px;
+  }
+  
+  .booked-slot-info {
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  
+  .booked-time {
+    font-size: 0.8rem;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  
+  .booked-icon {
+    font-size: 0.75rem;
+  }
+  
+  .booked-badge {
+    padding: 2px 5px;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+  }
+  
+  .customer-info {
+    font-size: 0.7rem;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  
+  .customer-info i {
+    font-size: 0.65rem;
   }
   
   .action-buttons {
     flex-direction: column;
+    gap: 12px;
+  }
+  
+  .primary-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .time-slots-container {
+    padding: 8px;
+  }
+  
+  .slot-config-header,
+  .weekly-schedule-section {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  
+  .slot-config-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .schedule-header h4 {
+    font-size: 1.1rem;
+  }
+  
+  .date-range {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+  }
+  
+  .day-card {
+    padding: 12px;
+  }
+  
+  .day-label {
+    font-size: 0.95rem;
+  }
+  
+  /* MOBILE FIX: Ultra compact but still in one line */
+  .available-slot-content {
+    gap: 6px;
+  }
+  
+  .time-inputs {
+    gap: 3px;
+  }
+  
+  .time-input {
+    padding: 5px 6px;
+    font-size: 0.75rem;
+    min-width: 60px;
+    max-width: 65px;
+  }
+  
+  .time-separator {
+    font-size: 0.7rem;
+    margin: 0 1px;
+  }
+  
+  .slot-actions {
+    gap: 4px;
+  }
+  
+  .booked-time {
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+  
+  .booked-icon {
+    font-size: 0.7rem;
+  }
+  
+  .booked-badge {
+    padding: 1px 4px;
+    font-size: 0.6rem;
+    border-radius: 8px;
+  }
+  
+  .customer-info {
+    font-size: 0.65rem;
+    gap: 3px;
+  }
+  
+  .customer-info i {
+    font-size: 0.6rem;
+  }
+  
+  .availability-toggle {
+    width: 28px;
+    height: 16px;
+  }
+  
+  .toggle-slider:before {
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+  }
+  
+  input:checked + .toggle-slider:before {
+    transform: translateX(12px);
+  }
+  
+  .btn {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+  
+  .btn-add-slot {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+  
+  /* Ultra compact booked slots */
+  .time-slot-item.booked-slot {
+    padding: 4px 6px;
+  }
+  
+  .booked-slot-info {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 360px) {
+  .time-slots-container {
+    padding: 6px;
+  }
+  
+  .slot-config-header,
+  .weekly-schedule-section {
+    padding: 12px;
+  }
+  
+  .day-card {
+    padding: 10px;
   }
   
   .time-slot-item {
-    flex-direction: column;
-    align-items: stretch;
+    padding: 5px 6px;
+    gap: 4px;
   }
   
-  .btn-remove-slot {
-    align-self: flex-end;
-    width: auto;
-    padding: 8px 12px;
+  /* MOBILE FIX: Ensure everything stays in one line even on very small screens */
+  .available-slot-content {
+    gap: 4px;
+  }
+  
+  .time-input {
+    padding: 4px 6px;
+    font-size: 0.7rem;
+    min-width: 55px;
+    max-width: 60px;
+  }
+  
+  .time-separator {
+    font-size: 0.65rem;
+  }
+  
+  .booked-badge {
+    font-size: 0.55rem;
+    padding: 1px 3px;
+  }
+  
+  /* Super compact booked slots */
+  .time-slot-item.booked-slot {
+    padding: 3px 5px;
+  }
+  
+  .booked-slot-info {
+    gap: 4px;
+  }
+}
+
+/* Special fix for very small mobile screens to prevent wrapping */
+@media (max-width: 320px) {
+  .available-slot-content {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  
+  .time-inputs {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  
+  .time-input {
+    min-width: 50px;
+    max-width: 55px;
+    font-size: 0.65rem;
+    padding: 3px 4px;
+  }
+  
+  .slot-actions {
+    flex-shrink: 0;
   }
 }
 </style>
