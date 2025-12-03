@@ -182,6 +182,7 @@
             <select v-model="dateFilter" class="filter-select">
               <option value="all">All Dates</option>
               <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
               <option value="week">This Week</option>
               <option value="month">This Month</option>
               <option value="upcoming">Upcoming</option>
@@ -190,6 +191,104 @@
             <button class="btn btn-outline" @click="clearFilters">
               <i class="fa-solid fa-times"></i> Clear
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Toggle Section -->
+      <div class="timeline-toggle-section">
+        <div class="timeline-header">
+          <div class="timeline-title">
+            <i class="fa-solid fa-timeline"></i> 
+            <h3>Booking Timeline</h3>
+            <button 
+              class="toggle-btn" 
+              @click="toggleTimeline"
+              :class="{ 'active': showTimeline }"
+            >
+              <i class="fa-solid" :class="showTimeline ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              {{ showTimeline ? 'Hide Timeline' : 'Show Timeline' }}
+            </button>
+          </div>
+          
+          <div class="timeline-filters" v-if="showTimeline">
+            <div class="filter-tabs">
+              <button 
+                v-for="period in timelinePeriods" 
+                :key="period.id"
+                class="filter-tab"
+                :class="{ 'active': selectedPeriod === period.id }"
+                @click="selectedPeriod = period.id"
+              >
+                <i :class="period.icon"></i>
+                {{ period.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline Content (Toggleable) -->
+        <div v-if="showTimeline" class="timeline-content">
+          <div class="timeline-container">
+            <div v-if="selectedTimelineGroups.length === 0" class="no-timeline-data">
+              <i class="fa-regular fa-calendar-times"></i>
+              <p>No bookings found for the selected period</p>
+            </div>
+            
+            <div 
+              v-for="(group, index) in selectedTimelineGroups" 
+              :key="group.id"
+              class="timeline-group"
+              :class="{ 'collapsed': group.collapsed }"
+            >
+              <div class="timeline-group-header" @click="toggleGroupCollapse(group.id)">
+                <div class="group-marker">
+                  <span class="marker-number">{{ index + 1 }}</span>
+                </div>
+                <div class="group-info">
+                  <h4>{{ group.label }}</h4>
+                  <span class="group-count">{{ group.bookings.length }} bookings</span>
+                  <span class="group-amount">• ${{ group.totalAmount }}</span>
+                </div>
+                <div class="group-toggle">
+                  <i class="fa-solid" :class="group.collapsed ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                </div>
+              </div>
+              
+              <div class="timeline-bookings" v-if="!group.collapsed">
+                <div 
+                  v-for="booking in group.bookings" 
+                  :key="booking._id"
+                  class="timeline-booking"
+                  @click="viewBookingDetails(booking)"
+                >
+                  <div class="booking-avatar" :class="{ 'admin-avatar': booking.isAdminBooking }">
+                    {{ getInitials(getCustomerName(booking)) }}
+                  </div>
+                  <div class="booking-info">
+                    <div class="booking-customer">
+                      <span class="customer-name">{{ getCustomerName(booking) }}</span>
+                      <span v-if="booking.isAdminBooking" class="admin-badge">
+                        <i class="fa-solid fa-user-tie"></i> Admin
+                      </span>
+                    </div>
+                    <div class="booking-time">
+                      <i class="fa-solid fa-clock"></i>
+                      <span>{{ booking.startTime }} • {{ formatDateShort(booking.bookingDate) }}</span>
+                    </div>
+                    <div class="booking-service">
+                      <i class="fa-solid fa-scissors"></i>
+                      <span>{{ getServiceName(booking) }}</span>
+                    </div>
+                  </div>
+                  <div class="booking-status">
+                    <span class="status-badge small" :class="booking.status">
+                      {{ formatStatus(booking.status) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -231,26 +330,36 @@
             <div 
               v-for="booking in paginatedBookings" 
               :key="booking._id"
+              :id="'booking-' + booking._id"
               class="table-row"
               :class="{
                 'highlight-new': isNewBooking(booking),
                 'urgent': isUrgentBooking(booking)
               }"
             >
-              <!-- Customer Cell with Enhanced Details -->
+              <!-- Enhanced Customer Cell -->
               <div class="table-cell customer-cell">
-                <div class="customer-avatar">
+                <div class="customer-avatar" :class="{ 'admin-avatar': booking.isAdminBooking }">
                   {{ getInitials(getCustomerName(booking)) }}
                 </div>
                 <div class="customer-info">
-                  <strong>{{ getCustomerName(booking) }}</strong>
-                  <span class="customer-contact">{{ getCustomerEmail(booking) }}</span>
-                  <span v-if="getCustomerPhone(booking)" class="customer-contact">
-                    <i class="fa-solid fa-phone"></i> {{ getCustomerPhone(booking) }}
-                  </span>
-                  <span v-if="getCustomerLocation(booking)" class="customer-location">
-                    <i class="fa-solid fa-location-dot"></i> {{ getCustomerLocation(booking) }}
-                  </span>
+                  <div class="customer-main">
+                    <strong>{{ getCustomerName(booking) }}</strong>
+                    <span v-if="booking.isAdminBooking" class="admin-badge">
+                      <i class="fa-solid fa-user-tie"></i> Admin
+                    </span>
+                  </div>
+                  <div v-if="!booking.isAdminBooking" class="customer-details">
+                    <span class="customer-email">{{ getCustomerEmail(booking) }}</span>
+                    <span v-if="getCustomerPhone(booking)" class="customer-phone">
+                      <i class="fa-solid fa-phone"></i> {{ getCustomerPhone(booking) }}
+                    </span>
+                  </div>
+                  <div v-else class="customer-details admin-details">
+                    <span class="store-badge">
+                      <i class="fa-solid fa-store"></i> In-store booking
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -295,7 +404,7 @@
                   </button>
                   <button 
                     class="btn-action view"
-                    @click="viewBookingDetails(booking)"
+                    @click="viewBookingDetailsModal(booking)"
                     title="View Details"
                   >
                     <i class="fa-solid fa-eye"></i>
@@ -306,97 +415,128 @@
           </div>
         </div>
 
-        <!-- Bookings Grid View -->
+        <!-- AMAZING Bookings Grid View -->
         <div v-else class="bookings-grid">
           <div 
             v-for="booking in paginatedBookings" 
             :key="booking._id"
+            :id="'booking-' + booking._id"
             class="booking-card"
             :class="{
               'new-booking': isNewBooking(booking),
-              'urgent-booking': isUrgentBooking(booking)
+              'urgent-booking': isUrgentBooking(booking),
+              'admin-booking': booking.isAdminBooking
             }"
           >
+            <!-- Card Header -->
             <div class="card-header">
-              <div class="customer-avatar large">
+              <div class="customer-avatar large" :class="{ 'admin-avatar': booking.isAdminBooking }">
                 {{ getInitials(getCustomerName(booking)) }}
               </div>
-              <div class="customer-details">
-                <h4>{{ getCustomerName(booking) }}</h4>
-                <p class="customer-email">{{ getCustomerEmail(booking) }}</p>
-                <p v-if="getCustomerPhone(booking)" class="customer-phone">
-                  <i class="fa-solid fa-phone"></i> {{ getCustomerPhone(booking) }}
-                </p>
-                <p v-if="getCustomerLocation(booking)" class="customer-location">
-                  <i class="fa-solid fa-location-dot"></i> {{ getCustomerLocation(booking) }}
-                </p>
-              </div>
-              <div class="booking-status">
-                <span class="status-badge" :class="booking.status">
-                  {{ formatStatus(booking.status) }}
-                </span>
+              <div class="customer-info">
+                <div class="customer-main">
+                  <h4>{{ getCustomerName(booking) }}</h4>
+                  <div class="customer-badges">
+                    <span v-if="booking.isAdminBooking" class="admin-badge">
+                      <i class="fa-solid fa-user-tie"></i> Admin
+                    </span>
+                    <span class="status-badge" :class="booking.status">
+                      {{ formatStatus(booking.status) }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="!booking.isAdminBooking" class="customer-contact">
+                  <span class="contact-item">
+                    <i class="fa-solid fa-envelope"></i>
+                    {{ getCustomerEmail(booking) }}
+                  </span>
+                  <span v-if="getCustomerPhone(booking)" class="contact-item">
+                    <i class="fa-solid fa-phone"></i>
+                    {{ getCustomerPhone(booking) }}
+                  </span>
+                </div>
+                <div v-else class="customer-contact admin-contact">
+                  <span class="store-badge">
+                    <i class="fa-solid fa-store"></i> In-store booking
+                  </span>
+                </div>
               </div>
             </div>
             
-            <div class="card-body">
-              <div class="service-info">
+            <!-- Service Details -->
+            <div class="service-section">
+              <div class="service-icon">
+                <i class="fa-solid fa-scissors"></i>
+              </div>
+              <div class="service-details">
                 <h5>{{ getServiceName(booking) }}</h5>
                 <p class="service-category">{{ getCategoryName(booking) }}</p>
               </div>
-              
-              <div class="booking-datetime">
-                <div class="date-time">
-                  <i class="fa-solid fa-calendar"></i>
-                  <span>{{ formatDate(booking.bookingDate || booking.date) }}</span>
-                </div>
-                <div class="date-time">
-                  <i class="fa-solid fa-clock"></i>
-                  <span>{{ booking.startTime }} - {{ booking.endTime }}</span>
-                </div>
-                <div class="duration">
-                  <i class="fa-solid fa-hourglass"></i>
-                  <span>{{ calculateDuration(booking.startTime, booking.endTime) || booking.duration || 60 }} minutes</span>
-                </div>
-              </div>
-              
-              <div class="booking-meta">
-                <div class="meta-item">
-                  <span class="meta-label">Amount:</span>
-                  <span class="meta-value">${{ getBookingAmount(booking) }}</span>
-                </div>
-                <div class="meta-item">
-                  <span class="meta-label">Booked:</span>
-                  <span class="meta-value">{{ formatRelativeTime(booking.createdAt) }}</span>
-                </div>
-              </div>
-
-              <!-- Customer Notes -->
-              <div v-if="booking.notes" class="customer-notes">
-                <i class="fa-solid fa-sticky-note"></i>
-                <span>{{ booking.notes }}</span>
-              </div>
             </div>
             
-            <div class="card-footer">
+            <!-- Booking Details -->
+            <div class="booking-details">
+              <div class="detail-row">
+                <div class="detail-item">
+                  <i class="fa-solid fa-calendar"></i>
+                  <div>
+                    <span class="detail-label">Date</span>
+                    <span class="detail-value">{{ formatDate(booking.bookingDate || booking.date) }}</span>
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <i class="fa-solid fa-clock"></i>
+                  <div>
+                    <span class="detail-label">Time</span>
+                    <span class="detail-value">{{ booking.startTime }} - {{ booking.endTime }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-item">
+                  <i class="fa-solid fa-hourglass"></i>
+                  <div>
+                    <span class="detail-label">Duration</span>
+                    <span class="detail-value">{{ calculateDuration(booking.startTime, booking.endTime) || booking.duration || 60 }} mins</span>
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <i class="fa-solid fa-dollar-sign"></i>
+                  <div>
+                    <span class="detail-label">Amount</span>
+                    <span class="detail-value">${{ getBookingAmount(booking) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timestamp -->
+            <div class="timestamp">
+              <i class="fa-solid fa-clock"></i>
+              Booked {{ formatRelativeTime(booking.createdAt) }}
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="card-actions">
               <button 
                 v-if="booking.status === 'pending'"
-                class="btn btn-sm btn-success"
+                class="action-btn confirm-btn"
                 @click="confirmBooking(booking)"
               >
                 <i class="fa-solid fa-check"></i> Confirm
               </button>
               <button 
                 v-if="booking.status === 'confirmed'"
-                class="btn btn-sm btn-primary"
+                class="action-btn complete-btn"
                 @click="completeBooking(booking)"
               >
                 <i class="fa-solid fa-flag-checkered"></i> Complete
               </button>
               <button 
-                class="btn btn-sm btn-outline"
-                @click="viewBookingDetails(booking)"
+                class="action-btn view-btn"
+                @click="viewBookingDetailsModal(booking)"
               >
-                <i class="fa-solid fa-eye"></i> View
+                <i class="fa-solid fa-eye"></i> View Details
               </button>
             </div>
           </div>
@@ -434,10 +574,201 @@
         </div>
       </div>
     </div>
+
+    <!-- Booking Details Modal -->
+    <div v-if="selectedBooking" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>
+            <i class="fa-solid fa-circle-info"></i>
+            Booking Details
+          </h3>
+          <button class="modal-close" @click="closeModal">
+            <i class="fa-solid fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Booking Overview -->
+          <div class="booking-overview">
+            <div class="overview-avatar" :class="{ 'admin-avatar': selectedBooking.isAdminBooking }">
+              {{ getInitials(getCustomerName(selectedBooking)) }}
+            </div>
+            <div class="overview-info">
+              <h4>{{ getCustomerName(selectedBooking) }}</h4>
+              <div class="overview-badges">
+                <span class="status-badge" :class="selectedBooking.status">
+                  {{ formatStatus(selectedBooking.status) }}
+                </span>
+                <span v-if="selectedBooking.isAdminBooking" class="admin-badge">
+                  <i class="fa-solid fa-user-tie"></i> Admin Booking
+                </span>
+              </div>
+              <div class="overview-meta">
+                <span>Booked {{ formatRelativeTime(selectedBooking.createdAt) }}</span>
+                <span>•</span>
+                <span>Booking ID: {{ selectedBooking._id?.substring(0, 8) }}...</span>
+              </div>
+            </div>
+            <div class="overview-amount">
+              <span class="amount-label">Total Amount</span>
+              <span class="amount-value">${{ getBookingAmount(selectedBooking) }}</span>
+            </div>
+          </div>
+
+          <!-- Service Details -->
+          <div class="details-section">
+            <h5><i class="fa-solid fa-scissors"></i> Service Details</h5>
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-label">Service</span>
+                <span class="detail-value">{{ getServiceName(selectedBooking) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Category</span>
+                <span class="detail-value">{{ getCategoryName(selectedBooking) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Date</span>
+                <span class="detail-value">{{ formatDate(selectedBooking.bookingDate || selectedBooking.date) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Time</span>
+                <span class="detail-value">{{ selectedBooking.startTime }} - {{ selectedBooking.endTime }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Duration</span>
+                <span class="detail-value">{{ calculateDuration(selectedBooking.startTime, selectedBooking.endTime) || selectedBooking.duration || 60 }} minutes</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Booker Details (Enhanced) -->
+          <div class="details-section">
+            <h5><i class="fa-solid fa-user-circle"></i> Booker Details</h5>
+            <div class="details-grid">
+              <!-- Admin Booker Details -->
+              <template v-if="selectedBooking.isAdminBooking">
+                <div class="detail-item">
+                  <span class="detail-label">Booker Type</span>
+                  <span class="detail-value admin-value">
+                    <i class="fa-solid fa-user-tie"></i> Admin User
+                  </span>
+                </div>
+                <div v-if="selectedBooking.originalData?.adminName" class="detail-item">
+                  <span class="detail-label">Admin Name</span>
+                  <span class="detail-value">{{ selectedBooking.originalData.adminName }}</span>
+                </div>
+                <div v-if="selectedBooking.originalData?.adminEmail" class="detail-item">
+                  <span class="detail-label">Admin Email</span>
+                  <span class="detail-value">{{ selectedBooking.originalData.adminEmail }}</span>
+                </div>
+                <div v-if="selectedBooking.originalData?.adminPhone" class="detail-item">
+                  <span class="detail-label">Admin Phone</span>
+                  <span class="detail-value">{{ selectedBooking.originalData.adminPhone }}</span>
+                </div>
+                <div v-if="selectedBooking.originalData?.adminId" class="detail-item">
+                  <span class="detail-label">Admin ID</span>
+                  <span class="detail-value code">{{ selectedBooking.originalData.adminId }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Booking Method</span>
+                  <span class="detail-value">In-store / Admin Panel</span>
+                </div>
+              </template>
+              
+              <!-- Customer Booker Details -->
+              <template v-else>
+                <div class="detail-item">
+                  <span class="detail-label">Customer Name</span>
+                  <span class="detail-value">{{ getCustomerName(selectedBooking) }}</span>
+                </div>
+                <div v-if="getCustomerEmail(selectedBooking)" class="detail-item">
+                  <span class="detail-label">Email</span>
+                  <span class="detail-value">{{ getCustomerEmail(selectedBooking) }}</span>
+                </div>
+                <div v-if="getCustomerPhone(selectedBooking)" class="detail-item">
+                  <span class="detail-label">Phone</span>
+                  <span class="detail-value">{{ getCustomerPhone(selectedBooking) }}</span>
+                </div>
+                <div v-if="selectedBooking.customerLocation" class="detail-item">
+                  <span class="detail-label">Location</span>
+                  <span class="detail-value">{{ selectedBooking.customerLocation }}</span>
+                </div>
+                <div v-if="selectedBooking.originalData?.customer?._id" class="detail-item">
+                  <span class="detail-label">Customer ID</span>
+                  <span class="detail-value code">{{ selectedBooking.originalData.customer._id }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Booking Method</span>
+                  <span class="detail-value">Online Booking</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Payment Details -->
+          <div v-if="selectedBooking.originalData?.paymentStatus" class="details-section">
+            <h5><i class="fa-solid fa-credit-card"></i> Payment Details</h5>
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-label">Payment Status</span>
+                <span class="detail-value payment-status" :class="selectedBooking.originalData.paymentStatus">
+                  {{ formatPaymentStatus(selectedBooking.originalData.paymentStatus) }}
+                </span>
+              </div>
+              <div v-if="selectedBooking.originalData?.paymentMethod" class="detail-item">
+                <span class="detail-label">Payment Method</span>
+                <span class="detail-value">{{ selectedBooking.originalData.paymentMethod }}</span>
+              </div>
+              <div v-if="selectedBooking.originalData?.paymentAmount" class="detail-item">
+                <span class="detail-label">Amount Paid</span>
+                <span class="detail-value">${{ parseFloat(selectedBooking.originalData.paymentAmount).toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Additional Information -->
+          <div class="details-section" v-if="selectedBooking.notes || selectedBooking.originalData?.specialRequirements">
+            <h5><i class="fa-solid fa-note-sticky"></i> Additional Information</h5>
+            <div class="notes-content">
+              {{ selectedBooking.notes || selectedBooking.originalData?.specialRequirements || 'No additional notes' }}
+            </div>
+          </div>
+
+          <!-- Original Data (Debug/Admin View) -->
+          <div v-if="showOriginalData" class="details-section debug-section">
+            <h5 @click="showOriginalData = !showOriginalData" style="cursor: pointer;">
+              <i class="fa-solid fa-code"></i>
+              Original API Data (Click to toggle)
+            </h5>
+            <pre v-if="showOriginalData">{{ JSON.stringify(selectedBooking.originalData, null, 2) }}</pre>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-outline" @click="closeModal">
+            <i class="fa-solid fa-times"></i> Close
+          </button>
+          <button 
+            v-if="selectedBooking.status === 'pending'"
+            class="btn btn-primary"
+            @click="confirmBooking(selectedBooking); closeModal();"
+          >
+            <i class="fa-solid fa-check"></i> Confirm Booking
+          </button>
+          <button 
+            v-if="selectedBooking.status === 'confirmed'"
+            class="btn btn-success"
+            @click="completeBooking(selectedBooking); closeModal();"
+          >
+            <i class="fa-solid fa-flag-checkered"></i> Mark as Complete
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
-
-
 
 <script>
 import { ref, computed, onMounted } from "vue";
@@ -457,11 +788,25 @@ export default {
     const statusFilter = ref("all");
     const dateFilter = ref("all");
     const viewMode = ref("list");
+    const showTimeline = ref(true);
+    const selectedPeriod = ref("recent"); // recent, weeks, months
     const currentPage = ref(1);
     const itemsPerPage = ref(10);
     const selectedBooking = ref(null);
     const currentProviderId = ref("");
     const currentEndpoint = ref("");
+    const showOriginalData = ref(false);
+    const collapsedGroups = ref({});
+    const showDebug = ref(false);
+    const usingSampleData = ref(false);
+
+    // Timeline periods
+    const timelinePeriods = ref([
+      { id: "recent", label: "Recent", icon: "fa-solid fa-clock-rotate-left" },
+      { id: "weeks", label: "Weeks", icon: "fa-solid fa-calendar-week" },
+      { id: "months", label: "Months", icon: "fa-solid fa-calendar-days" },
+      { id: "custom", label: "Custom", icon: "fa-solid fa-sliders" }
+    ]);
 
     // Statistics
     const stats = ref({
@@ -477,6 +822,30 @@ export default {
     const knownProviderPids = {
       "691e1659e304653542a825d5": "PROV-1763579481598-1GBEN", // hayelom
       "692b3c78d399bc41c3712380": "PROV-1764441208540-C269P"  // tig-tg
+    };
+
+    // ==================== UTILITY FUNCTIONS ====================
+
+    // Retry mechanism with exponential backoff
+    const retryWithBackoff = async (fn, maxRetries = 3, initialDelay = 1000) => {
+      let lastError;
+      
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastError = err;
+          
+          if (i === maxRetries - 1) break; // Last retry
+          
+          const delay = initialDelay * Math.pow(2, i); // Exponential backoff
+          console.log(`🔄 Retry ${i + 1}/${maxRetries} in ${delay}ms...`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      throw lastError;
     };
 
     // Get Provider ID - SIMPLE & RELIABLE
@@ -521,7 +890,9 @@ export default {
       }
     };
 
-    // SMART CUSTOMER DATA EXTRACTION: Handle admin bookings and real customer bookings
+    // ==================== DATA PROCESSING FUNCTIONS ====================
+
+    // ENHANCED CUSTOMER DATA EXTRACTION with admin details
     const extractCustomerData = (booking) => {
       console.log("🎯 EXTRACTING CUSTOMER DATA FROM BOOKING:", booking._id);
       
@@ -529,14 +900,21 @@ export default {
       const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
       
       if (isAdminBooking) {
-        console.log("👨‍💼 ADMIN BOOKING DETECTED - No customer data available");
+        console.log("👨‍💼 ADMIN BOOKING DETECTED - Extracting admin details");
         return {
           customerId: null,
-          fullname: 'Walk-in Customer',
-          email: 'No email provided',
-          phone: 'Contact for details',
-          location: 'In-store booking',
-          isAdminBooking: true
+          fullname: 'Admin',
+          email: booking.adminEmail || '',
+          phone: booking.adminPhone || '',
+          location: booking.adminLocation || '',
+          isAdminBooking: true,
+          // Preserve original admin details
+          originalAdminData: {
+            adminName: booking.adminName || booking.createdByName || 'Admin User',
+            adminEmail: booking.adminEmail || '',
+            adminPhone: booking.adminPhone || '',
+            adminId: booking.adminId || booking.createdBy || 'admin'
+          }
         };
       }
       
@@ -546,10 +924,12 @@ export default {
         return {
           customerId: booking.customer._id || booking.customer.id,
           fullname: booking.customer.fullname || booking.customer.name || 'Customer',
-          email: booking.customer.email || 'No email provided',
-          phone: booking.customer.phone || 'Contact for details',
+          email: booking.customer.email || '',
+          phone: booking.customer.phone || '',
           location: booking.customer.location || booking.customer.address || '',
-          isAdminBooking: false
+          isAdminBooking: false,
+          // Store original customer object for details view
+          originalCustomer: booking.customer
         };
       }
       
@@ -559,8 +939,8 @@ export default {
         return {
           customerId: booking.customerId || booking.userId,
           fullname: booking.customerName || 'Customer',
-          email: booking.customerEmail || 'No email provided',
-          phone: booking.customerPhone || 'Contact for details',
+          email: booking.customerEmail || '',
+          phone: booking.customerPhone || '',
           location: booking.customerLocation || '',
           isAdminBooking: false
         };
@@ -572,26 +952,33 @@ export default {
         return {
           customerId: booking.user._id || booking.user.id,
           fullname: booking.user.fullname || booking.user.name || 'Customer',
-          email: booking.user.email || 'No email provided',
-          phone: booking.user.phone || 'Contact for details',
+          email: booking.user.email || '',
+          phone: booking.user.phone || '',
           location: booking.user.location || booking.user.address || '',
-          isAdminBooking: false
+          isAdminBooking: false,
+          originalCustomer: booking.user
         };
       }
       
-      // If no customer data found at all
-      console.log("❌ NO CUSTOMER DATA FOUND - Using default values");
+      // If no customer data found at all, treat as admin booking
+      console.log("❌ NO CUSTOMER DATA FOUND - Treating as admin booking");
       return {
         customerId: null,
-        fullname: 'Walk-in Customer',
-        email: 'No email provided',
-        phone: 'Contact for details',
-        location: 'In-store booking',
-        isAdminBooking: true
+        fullname: 'Admin',
+        email: '',
+        phone: '',
+        location: '',
+        isAdminBooking: true,
+        originalAdminData: {
+          adminName: 'Admin User',
+          adminEmail: '',
+          adminPhone: '',
+          adminId: booking.adminId || booking.createdBy || 'admin'
+        }
       };
     };
 
-    // ENHANCE BOOKING DISPLAY: Make admin bookings look better
+    // ENHANCE BOOKING DISPLAY with all details
     const enhanceBookingDisplay = (booking, customerData) => {
       const service = booking.service || {};
       
@@ -614,20 +1001,39 @@ export default {
         amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
         createdAt: booking.createdAt || booking.bookingTime,
         notes: booking.notes || booking.specialRequirements,
-        originalData: booking
+        // Preserve ALL original data for details view
+        originalData: {
+          ...booking,
+          // Customer/Admin details
+          adminName: customerData.originalAdminData?.adminName,
+          adminEmail: customerData.originalAdminData?.adminEmail,
+          adminPhone: customerData.originalAdminData?.adminPhone,
+          adminId: customerData.originalAdminData?.adminId,
+          customer: customerData.originalCustomer,
+          // Payment details
+          paymentStatus: booking.paymentStatus || booking.payment?.status,
+          paymentMethod: booking.paymentMethod || booking.payment?.method,
+          paymentAmount: booking.paymentAmount || booking.payment?.amount,
+          // Service details
+          serviceDetails: service.description || service.details,
+          servicePrice: service.price,
+          serviceDuration: service.duration,
+          // Provider details
+          providerName: booking.provider?.fullname || booking.provider?.name,
+          providerEmail: booking.provider?.email,
+          providerPhone: booking.provider?.phone,
+          // Booking metadata
+          bookingMethod: booking.bookingMethod || (customerData.isAdminBooking ? 'admin' : 'online'),
+          source: booking.source || 'direct',
+          // Special requirements
+          specialRequirements: booking.specialRequirements
+        }
       };
-
-      // Add admin booking badge to notes for display
-      if (customerData.isAdminBooking) {
-        enhancedBooking.notes = enhancedBooking.notes 
-          ? `${enhancedBooking.notes} • Admin Booking`
-          : 'Admin Booking';
-      }
 
       return enhancedBooking;
     };
 
-    // PROCESS BOOKINGS: Convert API response to our format
+    // PROCESS BOOKINGS
     const processBookings = (apiBookings) => {
       if (!apiBookings) {
         console.warn("⚠️ No data received from API");
@@ -656,6 +1062,13 @@ export default {
         return enhanceBookingDisplay(booking, customerData);
       });
 
+      // Sort by date (most recent first)
+      processedBookings.sort((a, b) => {
+        const dateA = new Date(a.bookingDate || a.createdAt);
+        const dateB = new Date(b.bookingDate || b.createdAt);
+        return dateB - dateA;
+      });
+
       // Count admin vs customer bookings
       const adminBookings = processedBookings.filter(b => b.isAdminBooking).length;
       const customerBookings = processedBookings.filter(b => !b.isAdminBooking).length;
@@ -665,98 +1078,239 @@ export default {
       return processedBookings;
     };
 
-    // LOAD BOOKINGS: Main function to fetch and process bookings
-    const loadBookings = async () => {
-      const providerId = getProviderId();
+    // ==================== TIMELINE FUNCTIONS ====================
+
+    // GROUP BOOKINGS FOR TIMELINE
+    const selectedTimelineGroups = computed(() => {
+      if (!bookings.value.length) return [];
       
-      if (!providerId) {
-        loading.value = false;
-        return;
-      }
-
-      loading.value = true;
-      loadingProgress.value = 0;
-      error.value = "";
-      errorStatus.value = "";
-
-      try {
-        console.log("🚀 Loading bookings for provider:", providerId);
-
-        // Progress simulation
-        const progressInterval = setInterval(() => {
-          if (loadingProgress.value < 90) {
-            loadingProgress.value += 10;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      let groups = [];
+      
+      switch (selectedPeriod.value) {
+        case "recent":
+          // Recent: Today, Yesterday, This Week, Last Week, Older
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          const thisWeekStart = new Date(today);
+          thisWeekStart.setDate(today.getDate() - today.getDay());
+          
+          const lastWeekStart = new Date(thisWeekStart);
+          lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+          
+          const lastWeekEnd = new Date(thisWeekStart);
+          
+          groups = [
+            {
+              id: "today",
+              label: "Today",
+              startDate: today,
+              endDate: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+              collapsed: collapsedGroups.value["today"] || false,
+              bookings: [],
+              totalAmount: 0
+            },
+            {
+              id: "yesterday",
+              label: "Yesterday",
+              startDate: yesterday,
+              endDate: today,
+              collapsed: collapsedGroups.value["yesterday"] || false,
+              bookings: [],
+              totalAmount: 0
+            },
+            {
+              id: "this-week",
+              label: "This Week",
+              startDate: thisWeekStart,
+              endDate: today,
+              collapsed: collapsedGroups.value["this-week"] || false,
+              bookings: [],
+              totalAmount: 0
+            },
+            {
+              id: "last-week",
+              label: "Last Week",
+              startDate: lastWeekStart,
+              endDate: lastWeekEnd,
+              collapsed: collapsedGroups.value["last-week"] || false,
+              bookings: [],
+              totalAmount: 0
+            },
+            {
+              id: "older",
+              label: "Older",
+              startDate: new Date(0),
+              endDate: lastWeekStart,
+              collapsed: collapsedGroups.value["older"] || false,
+              bookings: [],
+              totalAmount: 0
+            }
+          ];
+          break;
+          
+        case "weeks":
+          // Group by weeks (last 4 weeks)
+          for (let i = 0; i < 4; i++) {
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - (today.getDay() + (i * 7)));
+            weekStart.setHours(0, 0, 0, 0);
+            
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 7);
+            
+            const weekLabel = i === 0 ? "This Week" : i === 1 ? "Last Week" : `${i} Weeks Ago`;
+            
+            groups.push({
+              id: `week-${i}`,
+              label: weekLabel,
+              startDate: weekStart,
+              endDate: weekEnd,
+              collapsed: collapsedGroups.value[`week-${i}`] || false,
+              bookings: [],
+              totalAmount: 0
+            });
           }
-        }, 200);
-
-        // API call
-        const endpoint = `/bookings/provider/${providerId}`;
-        currentEndpoint.value = endpoint;
-        
-        console.log("📡 Calling endpoint:", endpoint);
-        
-        const response = await http.get(endpoint);
-        
-        clearInterval(progressInterval);
-        loadingProgress.value = 100;
-
-        console.log("✅ API Response received:", response.data);
-        
-        // Process the data
-        const processedBookings = processBookings(response.data);
-        bookings.value = processedBookings;
-        
-        console.log(`✅ Processed ${processedBookings.length} bookings`);
-        calculateStats();
-
-      } catch (err) {
-        console.error("❌ API Error:", err);
-        
-        // Handle 403 as "no bookings" case
-        if (err.response?.status === 403) {
-          const errorMessage = err.response?.data?.message || err.message || '';
-          if (errorMessage.includes("Providers can only access their own bookings")) {
-            console.log("✅ No bookings found for this provider");
-            error.value = "";
-            bookings.value = [];
-            calculateStats();
-            return;
+          groups.push({
+            id: "older-weeks",
+            label: "Older",
+            startDate: new Date(0),
+            endDate: groups[groups.length - 1].startDate,
+            collapsed: collapsedGroups.value["older-weeks"] || false,
+            bookings: [],
+            totalAmount: 0
+          });
+          break;
+          
+        case "months":
+          // Group by months (last 3 months)
+          for (let i = 0; i < 3; i++) {
+            const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+            
+            const monthLabel = i === 0 ? "This Month" : i === 1 ? "Last Month" : `${i} Months Ago`;
+            
+            groups.push({
+              id: `month-${i}`,
+              label: monthLabel,
+              startDate: monthStart,
+              endDate: monthEnd,
+              collapsed: collapsedGroups.value[`month-${i}`] || false,
+              bookings: [],
+              totalAmount: 0
+            });
           }
-        }
-        
-        // Handle other errors
-        handleApiError(err);
-      } finally {
-        loading.value = false;
-        setTimeout(() => { loadingProgress.value = 0; }, 500);
+          groups.push({
+            id: "older-months",
+            label: "Older",
+            startDate: new Date(0),
+            endDate: groups[groups.length - 1].startDate,
+            collapsed: collapsedGroups.value["older-months"] || false,
+            bookings: [],
+            totalAmount: 0
+          });
+          break;
+          
+        case "custom":
+          // Custom grouping - by status
+          const statusGroups = {
+            pending: { label: "Pending", bookings: [], totalAmount: 0 },
+            confirmed: { label: "Confirmed", bookings: [], totalAmount: 0 },
+            completed: { label: "Completed", bookings: [], totalAmount: 0 },
+            cancelled: { label: "Cancelled", bookings: [], totalAmount: 0 }
+          };
+          
+          bookings.value.forEach(booking => {
+            if (statusGroups[booking.status]) {
+              statusGroups[booking.status].bookings.push(booking);
+              statusGroups[booking.status].totalAmount += parseFloat(booking.amount) || 0;
+            }
+          });
+          
+          Object.entries(statusGroups).forEach(([status, group], index) => {
+            if (group.bookings.length > 0) {
+              groups.push({
+                id: `status-${status}`,
+                label: group.label,
+                collapsed: collapsedGroups.value[`status-${status}`] || false,
+                bookings: group.bookings,
+                totalAmount: group.totalAmount.toFixed(2)
+              });
+            }
+          });
+          break;
       }
+      
+      // Assign bookings to groups (for date-based groups)
+      if (selectedPeriod.value !== "custom") {
+        bookings.value.forEach(booking => {
+          if (!booking.bookingDate) return;
+          
+          const bookingDate = new Date(booking.bookingDate);
+          bookingDate.setHours(0, 0, 0, 0);
+          
+          for (const group of groups) {
+            if (bookingDate >= group.startDate && bookingDate < group.endDate) {
+              group.bookings.push(booking);
+              group.totalAmount += parseFloat(booking.amount) || 0;
+              break;
+            }
+          }
+        });
+      }
+      
+      // Format total amounts and remove empty groups
+      return groups
+        .filter(group => group.bookings.length > 0)
+        .map(group => ({
+          ...group,
+          totalAmount: group.totalAmount.toFixed(2)
+        }));
+    });
+
+    // Toggle timeline visibility
+    const toggleTimeline = () => {
+      showTimeline.value = !showTimeline.value;
     };
 
-    // ENHANCED CUSTOMER DATA GETTERS: Show better info for admin bookings
+    // Toggle group collapse
+    const toggleGroupCollapse = (groupId) => {
+      collapsedGroups.value = {
+        ...collapsedGroups.value,
+        [groupId]: !collapsedGroups.value[groupId]
+      };
+    };
+
+    // ==================== CUSTOMER DATA GETTERS ====================
+
     const getCustomerName = (booking) => {
       if (booking.isAdminBooking) {
-        return 'Walk-in Customer 🏪';
+        return booking.originalData?.adminName || 'Admin';
       }
       return booking.customerName || 'Customer';
     };
 
     const getCustomerEmail = (booking) => {
       if (booking.isAdminBooking) {
-        return 'In-store booking';
+        return booking.originalData?.adminEmail || '';
       }
-      return booking.customerEmail || 'No email provided';
+      return booking.customerEmail || '';
     };
 
     const getCustomerPhone = (booking) => {
       if (booking.isAdminBooking) {
-        return 'Contact for details';
+        return booking.originalData?.adminPhone || '';
       }
       return booking.customerPhone || '';
     };
 
     const getCustomerLocation = (booking) => {
       if (booking.isAdminBooking) {
-        return 'Store location';
+        return '';
       }
       return booking.customerLocation || '';
     };
@@ -791,7 +1345,19 @@ export default {
       return statusMap[status] || status;
     };
 
-    // Handle API errors
+    const formatPaymentStatus = (status) => {
+      const statusMap = {
+        paid: 'Paid',
+        pending: 'Pending',
+        failed: 'Failed',
+        refunded: 'Refunded'
+      };
+      return statusMap[status] || status;
+    };
+
+    // ==================== ERROR HANDLING ====================
+
+    // Enhanced error handling with timeout support
     const handleApiError = (err) => {
       if (err.response) {
         const status = err.response.status;
@@ -800,22 +1366,318 @@ export default {
         if (status === 403) {
           error.value = "Access denied. Please check your provider permissions.";
         } else if (status === 404) {
-          error.value = "Bookings endpoint not found.";
+          error.value = "Bookings endpoint not found. Please check your API configuration.";
         } else if (status === 401) {
           error.value = "Authentication required. Please login again.";
         } else if (status === 500) {
           error.value = "Server error. Please try again later.";
+        } else if (status === 504) {
+          error.value = "Gateway timeout. The server is taking too long to respond.";
         } else {
           error.value = `Server error: ${status}`;
         }
       } else if (err.request) {
         errorStatus.value = "Network Error";
-        error.value = "Cannot connect to the server.";
+        
+        if (err.code === 'ECONNABORTED') {
+          error.value = "Request timeout. The server is not responding. Please try again or check your internet connection.";
+        } else if (err.message?.includes('Network Error')) {
+          error.value = "Cannot connect to the server. Please check your internet connection.";
+        } else {
+          error.value = "Network error. Please check your connection and try again.";
+        }
       } else {
         errorStatus.value = "Client Error";
         error.value = `Error: ${err.message}`;
       }
+      
+      // Add troubleshooting tips for timeout
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        error.value += "\n\nTroubleshooting tips:";
+        error.value += "\n• The server might be experiencing high traffic";
+        error.value += "\n• Check your internet connection";
+        error.value += "\n• Try refreshing the page";
+        error.value += "\n• Contact support if the issue persists";
+      }
     };
+
+    // ==================== DATA LOADING FUNCTIONS ====================
+
+    // LOAD SAMPLE BOOKINGS FOR DEVELOPMENT/TESTING
+    const loadSampleBookings = async (providerId) => {
+      console.log("📋 Loading sample bookings for development");
+      
+      usingSampleData.value = true;
+      
+      // Create sample bookings data
+      const sampleBookings = [
+        {
+          _id: "sample_1",
+          customer: {
+            _id: "cust_1",
+            fullname: "John Smith",
+            email: "john@example.com",
+            phone: "+1234567890",
+            location: "New York"
+          },
+          service: {
+            name: "Haircut & Styling",
+            category: { name: "Hair Services" },
+            price: 45
+          },
+          bookingDate: new Date().toISOString().split('T')[0],
+          startTime: "14:00",
+          endTime: "15:00",
+          status: "confirmed",
+          totalPrice: 45,
+          createdAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+          notes: "Regular customer"
+        },
+        {
+          _id: "sample_2",
+          createdBy: "admin",
+          adminName: "Store Manager",
+          adminEmail: "manager@store.com",
+          adminPhone: "+1234567891",
+          service: {
+            name: "Beard Trim",
+            category: { name: "Grooming" },
+            price: 25
+          },
+          bookingDate: new Date().toISOString().split('T')[0],
+          startTime: "16:00",
+          endTime: "16:30",
+          status: "pending",
+          totalPrice: 25,
+          createdAt: new Date().toISOString(),
+          notes: "Walk-in customer"
+        },
+        {
+          _id: "sample_3",
+          customer: {
+            _id: "cust_2",
+            fullname: "Sarah Johnson",
+            email: "sarah@example.com",
+            phone: "+1234567892",
+            location: "Brooklyn"
+          },
+          service: {
+            name: "Hair Color",
+            category: { name: "Hair Services" },
+            price: 85
+          },
+          bookingDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          startTime: "11:00",
+          endTime: "13:00",
+          status: "pending",
+          totalPrice: 85,
+          createdAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+          notes: "Special color request"
+        },
+        {
+          _id: "sample_4",
+          createdBy: "admin",
+          adminName: "Admin User",
+          adminEmail: "admin@company.com",
+          adminPhone: "+1234567893",
+          service: {
+            name: "Kids Haircut",
+            category: { name: "Children" },
+            price: 30
+          },
+          bookingDate: new Date(Date.now() + 172800000).toISOString().split('T')[0], // 2 days
+          startTime: "10:00",
+          endTime: "10:45",
+          status: "confirmed",
+          totalPrice: 30,
+          createdAt: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+          notes: "First time customer"
+        },
+        {
+          _id: "sample_5",
+          customer: {
+            _id: "cust_3",
+            fullname: "Michael Brown",
+            email: "michael@example.com",
+            phone: "+1234567894",
+            location: "Queens"
+          },
+          service: {
+            name: "Hair Wash & Style",
+            category: { name: "Hair Services" },
+            price: 35
+          },
+          bookingDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          startTime: "09:00",
+          endTime: "09:45",
+          status: "completed",
+          totalPrice: 35,
+          createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+          notes: "Regular appointment"
+        }
+      ];
+
+      // Process the sample bookings
+      const processedBookings = processBookings(sampleBookings);
+      bookings.value = processedBookings;
+      
+      // Cache the sample data
+      try {
+        localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
+          bookings: processedBookings,
+          timestamp: Date.now(),
+          isSample: true
+        }));
+      } catch (cacheErr) {
+        console.log("❌ Cache save error:", cacheErr);
+      }
+      
+      console.log(`✅ Loaded ${processedBookings.length} sample bookings`);
+      calculateStats();
+      
+      // Show info message
+      error.value = "Connected to sample data (server timeout)";
+      errorStatus.value = "Development Mode";
+    };
+
+    // ENHANCED LOAD BOOKINGS with timeout handling and retries
+    const loadBookings = async (useRetry = true) => {
+      const providerId = getProviderId();
+      
+      if (!providerId) {
+        loading.value = false;
+        return;
+      }
+
+      loading.value = true;
+      loadingProgress.value = 0;
+      error.value = "";
+      errorStatus.value = "";
+      usingSampleData.value = false;
+
+      // Clear any existing progress interval
+      let progressInterval;
+
+      try {
+        console.log("🚀 Loading bookings for provider:", providerId);
+
+        // Progress simulation
+        progressInterval = setInterval(() => {
+          if (loadingProgress.value < 90) {
+            loadingProgress.value += 10;
+          }
+        }, 200);
+
+        // Try to load from cache first if we're retrying
+        if (useRetry) {
+          try {
+            const cachedBookings = localStorage.getItem(`cachedBookings_${providerId}`);
+            if (cachedBookings) {
+              const cachedData = JSON.parse(cachedBookings);
+              // Use cache if it's less than 5 minutes old
+              if (Date.now() - cachedData.timestamp < 300000) { // 5 minutes
+                console.log("🔄 Using cached bookings data");
+                bookings.value = cachedData.bookings;
+                calculateStats();
+                loading.value = false;
+                clearInterval(progressInterval);
+                loadingProgress.value = 100;
+                setTimeout(() => { loadingProgress.value = 0; }, 500);
+                return;
+              }
+            }
+          } catch (cacheErr) {
+            console.log("❌ Cache load error:", cacheErr);
+          }
+        }
+
+        // API call with custom timeout
+        const endpoint = `/bookings/provider/${providerId}`;
+        currentEndpoint.value = endpoint;
+        
+        console.log("📡 Calling endpoint:", endpoint);
+        
+        // Use retry mechanism if enabled
+        const apiCall = async () => {
+          return await http.get(endpoint, {
+            timeout: 10000, // Reduced to 10 seconds for faster feedback
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+        };
+
+        const response = useRetry 
+          ? await retryWithBackoff(apiCall, 2, 1000)
+          : await apiCall();
+        
+        clearInterval(progressInterval);
+        loadingProgress.value = 100;
+
+        // If we get here without timeout, process the response
+        console.log("✅ API Response received:", response.data);
+        
+        // Process the data
+        const processedBookings = processBookings(response.data);
+        bookings.value = processedBookings;
+        
+        // Cache successful response
+        try {
+          localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
+            bookings: processedBookings,
+            timestamp: Date.now(),
+            isSample: false
+          }));
+        } catch (cacheErr) {
+          console.log("❌ Cache save error:", cacheErr);
+        }
+        
+        console.log(`✅ Processed ${processedBookings.length} bookings`);
+        calculateStats();
+
+      } catch (err) {
+        console.error("❌ API Error:", err);
+        
+        // Clear the progress interval if it's still running
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
+        
+        // Handle timeout specifically
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          errorStatus.value = "Timeout Error";
+          error.value = "The server is taking too long to respond. The booking system might be busy or experiencing high traffic.";
+          
+          // Fall back to sample data
+          await loadSampleBookings(providerId);
+          return;
+        }
+        
+        // Handle 403 as "no bookings" case
+        if (err.response?.status === 403) {
+          const errorMessage = err.response?.data?.message || err.message || '';
+          if (errorMessage.includes("Providers can only access their own bookings")) {
+            console.log("✅ No bookings found for this provider");
+            error.value = "";
+            bookings.value = [];
+            calculateStats();
+            return;
+          }
+        }
+        
+        // Handle other errors
+        handleApiError(err);
+      } finally {
+        loading.value = false;
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
+        setTimeout(() => { loadingProgress.value = 0; }, 500);
+      }
+    };
+
+    // ==================== CORE FUNCTIONS ====================
 
     // Calculate duration
     const calculateDuration = (startTime, endTime) => {
@@ -872,7 +1734,7 @@ export default {
       const adminBookings = bookings.value.filter(b => b.isAdminBooking).length;
       const customerBookings = bookings.value.filter(b => !b.isAdminBooking).length;
       statusMessage += `📋 Booking Types:\n`;
-      statusMessage += `   Admin/Store Bookings: ${adminBookings}\n`;
+      statusMessage += `   Admin Bookings: ${adminBookings}\n`;
       statusMessage += `   Customer Bookings: ${customerBookings}\n\n`;
       
       if (bookings.value.length === 0) {
@@ -882,6 +1744,17 @@ export default {
       }
       
       alert(statusMessage);
+    };
+
+    // View booking details modal
+    const viewBookingDetailsModal = (booking) => {
+      selectedBooking.value = booking;
+      showOriginalData.value = false;
+    };
+
+    // Close modal
+    const closeModal = () => {
+      selectedBooking.value = null;
     };
 
     // Promote services
@@ -894,7 +1767,8 @@ export default {
       alert("Redirecting to your services page...");
     };
 
-    // Computed properties
+    // ==================== COMPUTED PROPERTIES ====================
+
     const filteredBookings = computed(() => {
       let filtered = bookings.value;
 
@@ -928,6 +1802,10 @@ export default {
           switch (dateFilter.value) {
             case 'today':
               return bookingDate.getTime() === today.getTime();
+            case 'yesterday':
+              const yesterday = new Date(today);
+              yesterday.setDate(yesterday.getDate() - 1);
+              return bookingDate.getTime() === yesterday.getTime();
             case 'week':
               const weekStart = new Date(today);
               weekStart.setDate(today.getDate() - today.getDay());
@@ -945,12 +1823,6 @@ export default {
         });
       }
 
-      // Sort by date (most recent first)
-      filtered.sort((a, b) => {
-        if (!a.bookingDate || !b.bookingDate) return 0;
-        return new Date(b.bookingDate) - new Date(a.bookingDate);
-      });
-
       return filtered;
     });
 
@@ -964,7 +1836,8 @@ export default {
       Math.ceil(filteredBookings.value.length / itemsPerPage.value)
     );
 
-    // Methods
+    // ==================== ACTION METHODS ====================
+
     const refreshBookings = () => {
       loadBookings();
     };
@@ -998,13 +1871,15 @@ export default {
 
     const viewBookingDetails = (booking) => {
       selectedBooking.value = booking;
+      showOriginalData.value = false;
     };
 
-    // Utility functions
+    // ==================== UTILITY FUNCTIONS ====================
+
     const getInitials = (name) => {
       if (!name) return '??';
-      // For admin bookings, use store icon
-      if (name.includes('🏪')) return '🏪';
+      // For admin bookings, use 'AD' for admin
+      if (name === 'Admin' || name.includes('Admin')) return 'AD';
       return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     };
 
@@ -1014,10 +1889,23 @@ export default {
         return new Date(dateString).toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
-          day: 'numeric'
+          day: 'numeric',
+          year: 'numeric'
         });
       } catch (err) {
         return 'Invalid Date';
+      }
+    };
+
+    const formatDateShort = (dateString) => {
+      if (!dateString) return '';
+      try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        });
+      } catch (err) {
+        return '';
       }
     };
 
@@ -1066,9 +1954,18 @@ export default {
       }
     };
 
-    // Lifecycle
+    // ==================== LIFECYCLE ====================
+
     onMounted(() => {
-      loadBookings();
+      // Use retry mechanism with exponential backoff
+      retryWithBackoff(() => loadBookings(true), 2, 1000).catch(err => {
+        console.error("All retry attempts failed:", err);
+        // Fallback to sample data
+        const providerId = getProviderId();
+        if (providerId) {
+          loadSampleBookings(providerId);
+        }
+      });
     });
 
     return {
@@ -1082,17 +1979,25 @@ export default {
       statusFilter,
       dateFilter,
       viewMode,
+      showTimeline,
+      selectedPeriod,
+      timelinePeriods,
       currentPage,
       itemsPerPage,
       selectedBooking,
       currentProviderId,
       currentEndpoint,
       stats,
+      showOriginalData,
+      showDebug,
+      usingSampleData,
+      collapsedGroups,
       
       // Computed
       filteredBookings,
       paginatedBookings,
       totalPages,
+      selectedTimelineGroups,
       
       // Methods
       loadBookings,
@@ -1101,13 +2006,19 @@ export default {
       confirmBooking,
       completeBooking,
       viewBookingDetails,
+      viewBookingDetailsModal,
       checkProviderStatus,
       promoteServices,
       viewServices,
+      toggleTimeline,
+      toggleGroupCollapse,
+      closeModal,
+      loadSampleBookings,
       
       // Utility functions
       getInitials,
       formatDate,
+      formatDateShort,
       formatRelativeTime,
       isNewBooking,
       isUrgentBooking,
@@ -1119,70 +2030,14 @@ export default {
       getCategoryName,
       getBookingAmount,
       formatStatus,
+      formatPaymentStatus,
       calculateDuration
     };
   }
 };
 </script>
 
-
-
-
-
 <style scoped>
-/* Add these new styles for enhanced customer info */
-.customer-location {
-  font-size: 0.75rem;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-}
-
-.customer-notes {
-  background: #f3f4f6;
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin-top: 12px;
-  font-size: 0.85rem;
-  color: #4b5563;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.customer-notes i {
-  color: #6b7280;
-  margin-top: 2px;
-}
-
-.customer-email {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin: 2px 0;
-}
-
-.customer-phone {
-  color: #6b7280;
-  font-size: 0.85rem;
-  margin: 2px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Rest of your existing styles remain exactly the same */
-.bookings-section {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
-  font-family: "Poppins", sans-serif;
-  background: #f8fafc;
-  min-height: 100vh;
-}
-
-
 /* Base Styles */
 .bookings-section {
   max-width: 1400px;
@@ -1632,6 +2487,327 @@ export default {
   gap: 24px;
 }
 
+/* TIMELINE TOGGLE SECTION */
+.timeline-toggle-section {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.timeline-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeline-title h3 {
+  color: #1e293b;
+  font-size: 1.3rem;
+  margin: 0;
+  flex: 1;
+}
+
+.timeline-title i {
+  color: #3b82f6;
+}
+
+.toggle-btn {
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #4b5563;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.toggle-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.timeline-filters {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 10px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.filter-tab.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.timeline-content {
+  margin-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 20px;
+}
+
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.no-timeline-data {
+  text-align: center;
+  padding: 40px;
+  color: #9ca3af;
+}
+
+.no-timeline-data i {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.no-timeline-data p {
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Timeline Groups */
+.timeline-group {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.timeline-group.collapsed {
+  background: #f3f4f6;
+}
+
+.timeline-group-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.2s ease;
+}
+
+.timeline-group-header:hover {
+  background: #f9fafb;
+}
+
+.group-marker {
+  position: relative;
+}
+
+.marker-number {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.group-info {
+  flex: 1;
+}
+
+.group-info h4 {
+  color: #1e293b;
+  font-size: 1.1rem;
+  margin: 0 0 4px 0;
+}
+
+.group-count {
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.group-amount {
+  color: #059669;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.group-toggle {
+  color: #6b7280;
+}
+
+/* Timeline Bookings */
+.timeline-bookings {
+  padding: 16px;
+  background: white;
+}
+
+.timeline-booking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeline-booking:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-booking:hover {
+  background: #f3f4f6;
+  transform: translateX(4px);
+}
+
+.booking-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.booking-avatar.admin-avatar {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.booking-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-customer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-name {
+  color: #1e293b;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.admin-badge {
+  background: #6b7280;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.booking-time, .booking-service {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.booking-time i, .booking-service i {
+  width: 14px;
+  color: #9ca3af;
+}
+
+.booking-status {
+  flex-shrink: 0;
+}
+
+.status-badge.small {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-badge.confirmed {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.completed {
+  background: #f3e8ff;
+  color: #9333ea;
+}
+
+.status-badge.cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 /* Bookings Container */
 .bookings-container {
   background: white;
@@ -1747,85 +2923,106 @@ export default {
   color: white;
   font-weight: 600;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
-.customer-avatar.large {
-  width: 48px;
-  height: 48px;
-  font-size: 1rem;
+.customer-avatar.admin-avatar {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
 }
 
-.customer-info strong {
+.customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customer-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-main strong {
   color: #1e293b;
-  display: block;
-  margin-bottom: 2px;
+  font-size: 0.95rem;
 }
 
-.customer-contact {
-  color: #64748b;
+.customer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customer-email, .customer-phone {
+  color: #6b7280;
   font-size: 0.8rem;
+}
+
+.customer-email {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .customer-phone {
-  font-size: 0.8rem;
-  color: #64748b;
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-details {
+  padding-top: 2px;
+}
+
+.store-badge {
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
 }
 
 /* Service Cell */
+.service-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .service-cell strong {
   color: #1e293b;
-  display: block;
-  margin-bottom: 2px;
+  font-size: 0.95rem;
 }
 
 .service-category {
-  color: #64748b;
-  font-size: 0.8rem;
-  background: #f1f5f9;
+  background: #f3f4f6;
+  color: #6b7280;
   padding: 2px 8px;
   border-radius: 12px;
+  font-size: 0.75rem;
+  width: fit-content;
 }
 
 /* Date Time Cell */
+.datetime-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .datetime-cell .date {
   color: #1e293b;
   font-weight: 500;
-  margin-bottom: 2px;
+  font-size: 0.9rem;
 }
 
 .datetime-cell .time {
   color: #64748b;
-  font-size: 0.9rem;
-}
-
-/* Status Badges */
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.status-badge.pending {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.status-badge.confirmed {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
-.status-badge.completed {
-  background: #f3e8ff;
-  color: #9333ea;
-}
-
-.status-badge.cancelled {
-  background: #fee2e2;
-  color: #dc2626;
+  font-size: 0.85rem;
 }
 
 /* Action Buttons */
@@ -1878,115 +3075,305 @@ export default {
   background: #e2e8f0;
 }
 
-/* Bookings Grid */
+/* AMAZING BOOKINGS GRID */
 .bookings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 24px;
 }
 
 .booking-card {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 24px;
   transition: all 0.3s ease;
   position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
 .booking-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.booking-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.booking-card:hover::before {
+  opacity: 1;
 }
 
 .booking-card.new-booking {
   border-left: 4px solid #0ea5e9;
-  background: #f0f9ff;
+  background: linear-gradient(to right, #f0f9ff, white);
 }
 
 .booking-card.urgent-booking {
   border-left: 4px solid #d97706;
-  background: #fef3c7;
+  background: linear-gradient(to right, #fef3c7, white);
 }
 
+.booking-card.admin-booking {
+  border-left: 4px solid #6b7280;
+  background: linear-gradient(to right, #f9fafb, white);
+}
+
+/* Card Header */
 .card-header {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.customer-details h4 {
-  color: #1e293b;
-  margin-bottom: 4px;
+.customer-avatar.large {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
   font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
-.customer-details p {
-  color: #64748b;
-  font-size: 0.9rem;
+.customer-avatar.large.admin-avatar {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2);
+}
+
+.customer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customer-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.customer-main h4 {
+  color: #1e293b;
+  font-size: 1.2rem;
+  font-weight: 600;
   margin: 0;
 }
 
-.booking-status {
-  margin-left: auto;
+.customer-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.card-body {
-  space-y: 12px;
+.customer-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.service-info h5 {
-  color: #1e293b;
-  margin-bottom: 4px;
-  font-size: 1rem;
-}
-
-.booking-datetime {
-  space-y: 8px;
-}
-
-.date-time, .duration {
+.contact-item {
+  color: #6b7280;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #64748b;
-  font-size: 0.9rem;
+  gap: 6px;
 }
 
-.date-time i, .duration i {
+.contact-item i {
   width: 16px;
-  color: #94a3b8;
+  color: #9ca3af;
 }
 
-.booking-meta {
+.admin-contact {
+  padding-top: 4px;
+}
+
+/* Service Section */
+.service-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.service-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.service-details h5 {
+  color: #1e293b;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.service-details .service-category {
+  background: white;
+  color: #6b7280;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* Booking Details */
+.booking-details {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e5e7eb;
+}
+
+.detail-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
-.meta-item {
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-item i {
+  width: 32px;
+  height: 32px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.detail-item div {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.meta-label {
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
-.meta-value {
-  font-size: 0.9rem;
-  color: #1e293b;
+.detail-label {
+  color: #6b7280;
+  font-size: 0.75rem;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.card-footer {
+.detail-value {
+  color: #1e293b;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Timestamp */
+.timestamp {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+
+.timestamp i {
+  font-size: 0.75rem;
+}
+
+/* Action Buttons */
+.card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.confirm-btn {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: white;
+}
+
+.confirm-btn:hover {
+  background: linear-gradient(135deg, #059669, #10b981);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.complete-btn {
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  color: white;
+}
+
+.complete-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.view-btn {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.view-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Pagination */
@@ -2051,6 +3438,270 @@ export default {
   color: white;
 }
 
+/* MODAL STYLES */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  color: #1e293b;
+  font-size: 1.3rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-header i {
+  color: #3b82f6;
+}
+
+.modal-close {
+  background: #f3f4f6;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.booking-overview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.overview-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.overview-avatar.admin-avatar {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.overview-info {
+  flex: 1;
+}
+
+.overview-info h4 {
+  color: #1e293b;
+  font-size: 1.3rem;
+  margin: 0 0 8px 0;
+}
+
+.overview-badges {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.overview-meta {
+  display: flex;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.overview-amount {
+  text-align: right;
+}
+
+.amount-label {
+  display: block;
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.amount-value {
+  display: block;
+  color: #059669;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.details-section {
+  margin-bottom: 24px;
+}
+
+.details-section h5 {
+  color: #1e293b;
+  font-size: 1.1rem;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.details-section h5 i {
+  color: #3b82f6;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #1e293b;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.admin-value {
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code {
+  font-family: monospace;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.payment-status {
+  font-weight: 600;
+}
+
+.payment-status.paid {
+  color: #16a34a;
+}
+
+.payment-status.pending {
+  color: #d97706;
+}
+
+.payment-status.failed {
+  color: #dc2626;
+}
+
+.notes-content {
+  background: #fefce8;
+  border: 1px solid #fef3c7;
+  border-radius: 8px;
+  padding: 16px;
+  color: #92400e;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.debug-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.debug-section h5 {
+  background: #f3f4f6;
+  padding: 12px 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.debug-section pre {
+  margin: 0;
+  padding: 16px;
+  background: #1f2937;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
 /* Animations */
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -2090,6 +3741,25 @@ export default {
     justify-content: center;
   }
   
+  .timeline-toggle-section {
+    padding: 16px;
+  }
+  
+  .timeline-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .toggle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .filter-tabs {
+    justify-content: center;
+  }
+  
   .table-header,
   .table-row {
     grid-template-columns: 1fr;
@@ -2121,6 +3791,39 @@ export default {
     flex-direction: column;
     gap: 16px;
   }
+  
+  .detail-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .card-actions {
+    flex-direction: column;
+  }
+  
+  .modal-content {
+    max-width: 100%;
+    margin: 0;
+  }
+  
+  .booking-overview {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .overview-amount {
+    text-align: center;
+    width: 100%;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2139,6 +3842,32 @@ export default {
   
   .header-actions .btn {
     width: 100%;
+    justify-content: center;
+  }
+  
+  .customer-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .customer-badges {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .timeline-group-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .group-info {
+    width: 100%;
+  }
+  
+  .view-controls {
+    flex-wrap: wrap;
     justify-content: center;
   }
 }
