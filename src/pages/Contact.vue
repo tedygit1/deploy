@@ -1,4 +1,4 @@
-<!-- src/pages/ContactPage.vue -->
+<!-- src/pages/Contact.vue -->
 <template>
   <div class="contact-page font-poppins">
     <!-- Hero Section -->

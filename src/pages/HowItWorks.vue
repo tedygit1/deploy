@@ -1,4 +1,4 @@
-<!-- src/pages/HowItWorksPage.vue -->
+<!-- src/pages/HowItWorks.vue -->
 <template>
   <div class="how-it-works font-poppins">
     <!-- Hero Section -->

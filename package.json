@@ -18,9 +18,8 @@
     "vue-sonner": "^2.0.9"
   },
   "engines": {
-  "node": "20.x"
-},
-
+    "node": "20.x"
+  },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
     "vite": "^7.1.7"

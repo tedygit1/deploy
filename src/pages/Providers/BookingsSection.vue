@@ -179,26 +179,17 @@
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
-            <select v-model="dateFilter" class="filter-select">
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="past">Past</option>
-            </select>
             <button class="btn btn-outline" @click="clearFilters">
-              <i class="fa-solid fa-times"></i> Clear
+              <i class="fa-solid fa-times"></i> Clear All
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Timeline Filter Section (Replaces timeline display) -->
+      <!-- Timeline Filter Section (UPDATED & WORKING) -->
       <div class="timeline-filter-section">
         <div class="timeline-filter-header">
-          <h3><i class="fa-solid fa-timeline"></i> Filter by Time Period</h3>
+          <h3><i class="fa-solid fa-filter"></i> Filter by Time Period</h3>
           <p class="timeline-filter-subtitle">Select a time period to view bookings from that timeframe</p>
         </div>
         
@@ -215,15 +206,64 @@
           </button>
         </div>
         
-        <div v-if="selectedPeriodLabel" class="timeline-active-filter">
-          <span class="active-filter-badge">
-            <i class="fa-solid fa-filter"></i>
-            Showing: {{ selectedPeriodLabel }}
-            <button class="clear-period-btn" @click="clearTimelinePeriod">
+        <!-- Custom Range Picker (NEW) -->
+        <div v-if="selectedPeriod === 'custom'" class="custom-range-picker">
+          <div class="custom-range-header">
+            <h4><i class="fa-solid fa-calendar-days"></i> Select Custom Date Range</h4>
+          </div>
+          <div class="date-inputs">
+            <div class="date-input-group">
+              <label>Start Date</label>
+              <input 
+                type="date" 
+                v-model="customStartDate" 
+                class="date-input"
+                @change="applyCustomRange"
+              />
+            </div>
+            <div class="date-input-group">
+              <label>End Date</label>
+              <input 
+                type="date" 
+                v-model="customEndDate" 
+                class="date-input"
+                :min="customStartDate"
+                @change="applyCustomRange"
+              />
+            </div>
+            <button 
+              class="btn btn-outline" 
+              @click="clearCustomRange"
+              title="Clear custom range"
+            >
               <i class="fa-solid fa-times"></i>
             </button>
-          </span>
-          <span class="filter-count">{{ timelineFilteredBookings.length }} bookings found</span>
+          </div>
+          <div v-if="customDateError" class="custom-range-error">
+            {{ customDateError }}
+          </div>
+        </div>
+        
+        <!-- Active Filter Display (UPDATED) -->
+        <div v-if="selectedPeriod !== 'all'" class="timeline-active-filter">
+          <div class="active-filter-row">
+            <span class="active-filter-badge">
+              <i class="fa-solid fa-filter"></i>
+              Showing: {{ getActiveFilterLabel() }}
+              <button class="clear-period-btn" @click="clearTimelinePeriod">
+                <i class="fa-solid fa-times"></i>
+              </button>
+            </span>
+            <span class="filter-count">{{ timelineFilteredBookings.length }} bookings found</span>
+          </div>
+          
+          <!-- Date Range Display for Custom -->
+          <div v-if="selectedPeriod === 'custom' && customStartDate && customEndDate" 
+               class="custom-range-display">
+            <span class="date-range">
+              {{ formatDateDisplay(customStartDate) }} to {{ formatDateDisplay(customEndDate) }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -231,7 +271,7 @@
       <div class="bookings-container">
         <div class="section-header">
           <h2>
-            <span v-if="selectedPeriodLabel">{{ selectedPeriodLabel }} </span>
+            <span v-if="selectedPeriod !== 'all'">{{ getActiveFilterLabel() }} </span>
             Bookings ({{ displayBookings.length }})
           </h2>
           <div class="view-controls">
@@ -664,41 +704,7 @@
               </div>
             </div>
           </div>
-<!-- Error State -->
-<div v-else-if="error" class="error-container">
-  <div class="error-content">
-    <div class="error-icon">
-      <i class="fa-solid fa-exclamation-triangle"></i>
-    </div>
-    <h3>Unable to Load Bookings</h3>
-    <p>{{ error }}</p>
-    
-    <div class="error-details">
-      <p><strong>Status:</strong> {{ errorStatus }}</p>
-      <p><strong>Provider PID:</strong> {{ currentProviderId }}</p>
-      <p><strong>Environment:</strong> {{ isDeployed ? 'Deployed (Vercel)' : 'Local' }}</p>
-      <p><strong>Data Source:</strong> {{ usingSampleData ? 'Sample Data' : 'Real API' }}</p>
-    </div>
-    
-    <div v-if="errorStatus.includes('CORS')" class="cors-help">
-      <h4><i class="fa-solid fa-shield"></i> CORS Issue Detected</h4>
-      <p>The backend server is blocking cross-origin requests from Vercel.</p>
-      <p>Showing sample data for demonstration. Real bookings will load when CORS is fixed.</p>
-    </div>
-    
-    <div class="error-actions">
-      <button class="btn btn-primary" @click="loadBookings">
-        <i class="fa-solid fa-rotate"></i> Try Again
-      </button>
-      <button class="btn btn-outline" @click="testConnection">
-        <i class="fa-solid fa-plug"></i> Test Connection
-      </button>
-      <button class="btn btn-outline" @click="checkProviderStatus">
-        <i class="fa-solid fa-user-check"></i> Check Status
-      </button>
-    </div>
-  </div>
-</div>
+
           <!-- Additional Information -->
           <div class="details-section" v-if="selectedBooking.notes || selectedBooking.originalData?.specialRequirements">
             <h5><i class="fa-solid fa-note-sticky"></i> Additional Information</h5>
@@ -742,7 +748,7 @@
 </template>
   
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import http from "@/api/index.js";
 
 export default {
@@ -757,7 +763,6 @@ export default {
     const bookings = ref([]);
     const searchQuery = ref("");
     const statusFilter = ref("all");
-    const dateFilter = ref("all");
     const viewMode = ref("list");
     const selectedPeriod = ref("all");
     const currentPage = ref(1);
@@ -769,9 +774,15 @@ export default {
     const showDebug = ref(false);
     const usingSampleData = ref(false);
     const isDeployed = ref(window.location.hostname.includes('vercel.app'));
+    
+    // NEW: Custom date range
+    const customStartDate = ref("");
+    const customEndDate = ref("");
+    const customDateError = ref("");
 
-    // Timeline periods
+    // Timeline periods - UPDATED with "All Bookings" option
     const timelinePeriods = ref([
+      { id: "all", label: "All Bookings", icon: "fa-solid fa-calendar" },
       { id: "today", label: "Today", icon: "fa-solid fa-calendar-day" },
       { id: "yesterday", label: "Yesterday", icon: "fa-solid fa-calendar-minus" },
       { id: "week", label: "This Week", icon: "fa-solid fa-calendar-week" },
@@ -797,12 +808,6 @@ export default {
 
     // ==================== COMPUTED PROPERTIES ====================
 
-    const selectedPeriodLabel = computed(() => {
-      if (selectedPeriod.value === "all") return "";
-      const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
-      return period ? period.label : "";
-    });
-
     const timelineFilteredBookings = computed(() => {
       if (selectedPeriod.value === "all" || !selectedPeriod.value) {
         return bookings.value;
@@ -820,19 +825,35 @@ export default {
         switch (selectedPeriod.value) {
           case "today":
             return bookingDate.getTime() === today.getTime();
+            
           case "yesterday":
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
             return bookingDate.getTime() === yesterday.getTime();
+            
           case "week":
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() - today.getDay());
-            return bookingDate >= weekStart;
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6); // End of week (Saturday)
+            return bookingDate >= startOfWeek && bookingDate <= endOfWeek;
+            
           case "month":
-            return bookingDate.getMonth() === today.getMonth() && 
-                   bookingDate.getFullYear() === today.getFullYear();
+            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
+            
           case "custom":
-            return true;
+            if (!customStartDate.value || !customEndDate.value) return true;
+            
+            const start = new Date(customStartDate.value);
+            start.setHours(0, 0, 0, 0);
+            
+            const end = new Date(customEndDate.value);
+            end.setHours(23, 59, 59, 999);
+            
+            return bookingDate >= start && bookingDate <= end;
+            
           default:
             return true;
         }
@@ -858,41 +879,6 @@ export default {
         filtered = filtered.filter(booking => booking.status === statusFilter.value);
       }
 
-      // Date filter
-      if (dateFilter.value !== 'all') {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        filtered = filtered.filter(booking => {
-          if (!booking.bookingDate) return false;
-          
-          const bookingDate = new Date(booking.bookingDate);
-          bookingDate.setHours(0, 0, 0, 0);
-          
-          switch (dateFilter.value) {
-            case 'today':
-              return bookingDate.getTime() === today.getTime();
-            case 'yesterday':
-              const yesterday = new Date(today);
-              yesterday.setDate(yesterday.getDate() - 1);
-              return bookingDate.getTime() === yesterday.getTime();
-            case 'week':
-              const weekStart = new Date(today);
-              weekStart.setDate(today.getDate() - today.getDay());
-              return bookingDate >= weekStart;
-            case 'month':
-              return bookingDate.getMonth() === today.getMonth() && 
-                     bookingDate.getFullYear() === today.getFullYear();
-            case 'upcoming':
-              return bookingDate >= today;
-            case 'past':
-              return bookingDate < today;
-            default:
-              return true;
-          }
-        });
-      }
-
       return filtered;
     });
 
@@ -913,12 +899,94 @@ export default {
     const selectTimelinePeriod = (periodId) => {
       selectedPeriod.value = periodId;
       currentPage.value = 1;
+      
+      // Set default dates for custom range
+      if (periodId === 'custom' && !customStartDate.value) {
+        const today = new Date();
+        const oneWeekAgo = new Date(today);
+        oneWeekAgo.setDate(today.getDate() - 7);
+        
+        customStartDate.value = formatDateForInput(oneWeekAgo);
+        customEndDate.value = formatDateForInput(today);
+        applyCustomRange();
+      }
     };
 
     const clearTimelinePeriod = () => {
       selectedPeriod.value = "all";
+      customStartDate.value = "";
+      customEndDate.value = "";
+      customDateError.value = "";
       currentPage.value = 1;
     };
+
+    const clearCustomRange = () => {
+      customStartDate.value = "";
+      customEndDate.value = "";
+      customDateError.value = "";
+      
+      // If custom period is selected, switch to all
+      if (selectedPeriod.value === 'custom') {
+        selectedPeriod.value = 'all';
+      }
+    };
+
+    const applyCustomRange = () => {
+      if (!customStartDate.value || !customEndDate.value) {
+        customDateError.value = "Please select both start and end dates";
+        return;
+      }
+      
+      const start = new Date(customStartDate.value);
+      const end = new Date(customEndDate.value);
+      
+      if (start > end) {
+        customDateError.value = "Start date cannot be after end date";
+        return;
+      }
+      
+      customDateError.value = "";
+      selectedPeriod.value = 'custom';
+      currentPage.value = 1;
+    };
+
+    const getActiveFilterLabel = () => {
+      if (selectedPeriod.value === "all") return "All";
+      
+      const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
+      if (period) {
+        if (period.id === 'custom' && customStartDate.value && customEndDate.value) {
+          return `Custom: ${formatDateDisplay(customStartDate.value)} - ${formatDateDisplay(customEndDate.value)}`;
+        }
+        return period.label;
+      }
+      
+      return "";
+    };
+
+    const formatDateForInput = (date) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const formatDateDisplay = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+
+    // Watch for custom date changes
+    watch([customStartDate, customEndDate], () => {
+      if (customStartDate.value && customEndDate.value) {
+        applyCustomRange();
+      }
+    });
 
     // ==================== CORS-FRIENDLY LOADING ====================
 
@@ -1102,7 +1170,6 @@ export default {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            // DO NOT include Pragma, Cache-Control, or other headers that trigger preflight
           }
         };
         return await http.get(url, safeOptions);
@@ -1442,8 +1509,7 @@ export default {
     const clearFilters = () => {
       searchQuery.value = "";
       statusFilter.value = "all";
-      dateFilter.value = "all";
-      clearTimelinePeriod();
+      clearTimelinePeriod(); // This now clears the timeline filter too
     };
 
     const confirmBooking = async (booking) => {
@@ -1555,6 +1621,15 @@ export default {
       return statusMap[status] || status;
     };
 
+    const formatPaymentStatus = (status) => {
+      const statusMap = {
+        paid: 'Paid',
+        pending: 'Pending',
+        failed: 'Failed'
+      };
+      return statusMap[status] || status;
+    };
+
     const getInitials = (name) => {
       if (!name) return '??';
       if (name === 'Admin' || name.includes('Admin')) return 'AD';
@@ -1635,7 +1710,6 @@ export default {
       bookings,
       searchQuery,
       statusFilter,
-      dateFilter,
       viewMode,
       selectedPeriod,
       timelinePeriods,
@@ -1650,11 +1724,16 @@ export default {
       usingSampleData,
       isDeployed,
       
+      // NEW: Custom date range variables
+      customStartDate,
+      customEndDate,
+      customDateError,
+      
       // Computed
-      selectedPeriodLabel,
       displayBookings,
       paginatedBookings,
       totalPages,
+      timelineFilteredBookings,
       
       // Methods
       loadBookings,
@@ -1668,12 +1747,16 @@ export default {
       viewServices,
       selectTimelinePeriod,
       clearTimelinePeriod,
+      clearCustomRange,
+      applyCustomRange,
       closeModal,
       testConnection,
       
       // Utility functions
+      getActiveFilterLabel,
       getInitials,
       formatDate,
+      formatDateDisplay,
       formatRelativeTime,
       isNewBooking,
       isUrgentBooking,
@@ -1684,6 +1767,7 @@ export default {
       getCategoryName,
       getBookingAmount,
       formatStatus,
+      formatPaymentStatus,
       calculateDuration
     };
   }
@@ -2140,7 +2224,7 @@ export default {
   gap: 24px;
 }
 
-/* TIMELINE FILTER SECTION (New) */
+/* TIMELINE FILTER SECTION (UPDATED) */
 .timeline-filter-section {
   background: white;
   border-radius: 16px;
@@ -2209,14 +2293,105 @@ export default {
   color: white;
 }
 
-.timeline-active-filter {
+/* Custom Range Picker */
+.custom-range-picker {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+  margin-bottom: 20px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.custom-range-header {
+  margin-bottom: 16px;
+}
+
+.custom-range-header h4 {
+  color: #1e293b;
+  font-size: 1rem;
+  margin: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+  gap: 8px;
+}
+
+.custom-range-header i {
+  color: #3b82f6;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.date-input-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.date-input-group label {
+  display: block;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.date-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.custom-range-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fee2e2;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
+.timeline-active-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
   background: #f0f9ff;
   border-radius: 12px;
   border: 1px solid #bae6fd;
+}
+
+.active-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .active-filter-badge {
@@ -2260,6 +2435,20 @@ export default {
   color: #0369a1;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.custom-range-display {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.date-range {
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 /* Bookings Container */
@@ -3304,6 +3493,23 @@ export default {
   .view-controls {
     flex-wrap: wrap;
     justify-content: center;
+  }
+  
+  .timeline-filter-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .timeline-filter-btn {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+  
+  .date-inputs {
+    flex-direction: column;
+  }
+  
+  .date-input-group {
+    min-width: 100%;
   }
 }
 </style>

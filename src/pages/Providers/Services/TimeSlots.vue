@@ -1,3 +1,4 @@
+<!-- src/pages/Providers/TimeSlots.vue -->
 <template>
   <div class="time-slots-container">
     <!-- Loading State -->
@@ -34,30 +35,9 @@
         <p>Add time slots to activate and publish this service</p>
       </div>
     </div>
+
     <!-- Time Slots Management -->
     <div class="time-slots-content" v-if="!loading">
-      <!-- Slot Configuration Header -->
-      <div class="slot-config-header">
-        <h3>7-Day Rolling Schedule</h3>
-        <p class="schedule-description">
-          Set availability for the next 7 days. Customers can book appointments within this window.
-        </p>
-        <div class="slot-config-controls">
-          <label class="config-toggle">
-            <input
-              type="checkbox"
-              v-model="slotConfig.isActive"
-            />
-            <span class="toggle-label">Active Configuration</span>
-          </label>
-          <input
-            v-model="slotConfig.slotLabel"
-            type="text"
-            class="slot-label-input"
-            placeholder="Schedule Name"
-          />
-        </div>
-      </div>
       <!-- 7-Day Schedule -->
       <div class="weekly-schedule-section">
         <div class="schedule-header">
@@ -102,30 +82,20 @@
                 class="time-slot-item"
                 :class="{ 
                   'has-error': timeSlot.hasError,
-                  'booked-slot': timeSlot.isBooked
+                  'booked-slot': timeSlot.isBooked,
+                  'available-slot': !timeSlot.isBooked && timeSlot.isAvailable,
+                  'unavailable-slot': !timeSlot.isBooked && !timeSlot.isAvailable
                 }"
               >
-                <!-- BOOKED SLOT - SINGLE LINE -->
-                <div v-if="timeSlot.isBooked" class="booked-slot-content">
-                  <div class="booked-time">
-                    <i class="fa-solid fa-clock booked-icon"></i>
-                    <span class="time-text">{{ formatTime12(timeSlot.startTime) }} – {{ formatTime12(timeSlot.endTime) }}</span>
-                  </div>
-                  <div class="booked-details">
-                    <span class="booked-badge">BOOKED</span>
-                    <div v-if="getBookingForSlot(day.date, timeSlot.startTime, timeSlot.endTime)" 
-                         class="customer-info">
-                      <i class="fa-solid fa-user"></i>
-                      <span class="customer-name">
-                        {{ getBookingForSlot(day.date, timeSlot.startTime, timeSlot.endTime).customerName || 'Customer' }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <!-- AVAILABLE SLOT - SINGLE LINE -->
-                <div v-else class="available-slot-content">
-                  <div class="time-inputs-group">
-                    <div class="time-inputs">
+                <!-- COMPACT SINGLE LINE LAYOUT -->
+                <div class="slot-compact-line">
+                  <!-- TIME RANGE -->
+                  <div class="time-range-compact">
+                    <i class="fa-solid fa-clock slot-icon"></i>
+                    <span v-if="timeSlot.isBooked" class="booked-time-text">
+                      {{ formatTime12(timeSlot.startTime) }}–{{ formatTime12(timeSlot.endTime) }}
+                    </span>
+                    <span v-else class="edit-time-range">
                       <input
                         :value="formatTime(timeSlot.startTime)"
                         @input="updateTimeSlot(timeSlot, 'startTime', $event.target.value)"
@@ -133,7 +103,7 @@
                         class="time-input"
                         @change="validateTimeSlot(timeSlot)"
                       />
-                      <span class="time-separator">to</span>
+                      <span class="time-separator">–</span>
                       <input
                         :value="formatTime(timeSlot.endTime)"
                         @input="updateTimeSlot(timeSlot, 'endTime', $event.target.value)"
@@ -141,32 +111,52 @@
                         class="time-input"
                         @change="validateTimeSlot(timeSlot)"
                       />
+                    </span>
+                  </div>
+
+                  <!-- STATUS INDICATOR -->
+                  <div class="status-indicator-compact">
+                    <!-- BOOKED -->
+                    <div v-if="timeSlot.isBooked" class="booked-indicator">
+                      <span class="status-dot booked-dot" title="BOOKED"></span>
+                      <span v-if="getBookingForSlot(day.date, timeSlot.startTime, timeSlot.endTime)" 
+                            class="customer-compact">
+                        <i class="fa-solid fa-user"></i>
+                      </span>
                     </div>
-                    <div v-if="timeSlot.hasError" class="slot-error-mobile">
-                      {{ timeSlot.errorMessage }}
+                    
+                    <!-- AVAILABLE/UNAVAILABLE TOGGLE SWITCH -->
+                    <div v-else class="toggle-container">
+                      <label class="toggle-switch" :title="timeSlot.isAvailable ? 'Available - Click to make unavailable' : 'Unavailable - Click to make available'">
+                        <input
+                          type="checkbox"
+                          v-model="timeSlot.isAvailable"
+                        />
+                        <span class="toggle-slider"></span>
+                      </label>
                     </div>
                   </div>
-                  <div class="slot-controls">
-                    <label class="availability-toggle" :title="timeSlot.isAvailable ? 'Available' : 'Unavailable'">
-                      <input
-                        type="checkbox"
-                        v-model="timeSlot.isAvailable"
-                      />
-                      <span class="toggle-slider"></span>
-                    </label>
+
+                  <!-- ERROR & REMOVE -->
+                  <div class="actions-compact">
+                    <div v-if="timeSlot.hasError" class="error-indicator" :title="timeSlot.errorMessage">
+                      <i class="fa-solid fa-exclamation-triangle"></i>
+                    </div>
                     <button
-                      class="btn-remove-slot"
+                      class="remove-btn-compact"
                       @click="removeTimeSlot(day.date, slotIndex)"
-                      :disabled="dailySchedules[day.date].length === 1"
-                      title="Remove time slot"
+                      :disabled="dailySchedules[day.date].length === 1 || timeSlot.isBooked"
+                      :title="timeSlot.isBooked ? 'Cannot remove booked slot' : 'Remove time slot'"
                     >
-                      <i class="fa-solid fa-trash"></i>
+                      <i class="fa-solid fa-times"></i>
                     </button>
                   </div>
                 </div>
               </div>
+              
+              <!-- ADD SLOT BUTTON -->
               <button 
-                class="btn-add-slot" 
+                class="btn-add-slot-compact" 
                 @click="addTimeSlot(day.date)"
                 :disabled="loadingBookings"
               >
@@ -181,6 +171,7 @@
           </div>
         </div>
       </div>
+
       <!-- Action Buttons -->
       <div class="action-buttons">
         <button class="btn btn-secondary" @click="handleCancel">
@@ -216,6 +207,7 @@
           </button>
         </div>
       </div>
+
       <!-- Debug Info -->
       <div v-if="debugMode" class="debug-info">
         <h5>Debug Info:</h5>
@@ -233,6 +225,7 @@
 
 <script>
 import http from '@/api/index.js';
+
 export default {
   name: 'TimeSlots',
   props: {
@@ -648,7 +641,7 @@ export default {
 <style scoped>
 /* ===== BASE STYLES ===== */
 .time-slots-container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   font-family: "Inter", sans-serif;
@@ -677,52 +670,6 @@ export default {
   opacity: 0.7;
 }
 .close-error:hover, .close-success:hover { opacity: 1; }
-
-/* ===== CONFIG HEADER ===== */
-.slot-config-header {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  margin-bottom: 24px;
-}
-.slot-config-header h3 {
-  font-size: 1.4rem;
-  margin-bottom: 8px;
-  color: #0f172a;
-}
-.schedule-description {
-  color: #64748b;
-  margin-bottom: 16px;
-  line-height: 1.5;
-  font-size: 0.95rem;
-}
-.slot-config-controls {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.config-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-  color: #334155;
-}
-.slot-label-input {
-  flex: 1;
-  min-width: 220px;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 0.95rem;
-}
-.slot-label-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-}
 
 /* ===== WEEKLY SCHEDULE ===== */
 .weekly-schedule-section {
@@ -762,7 +709,7 @@ export default {
 /* ===== DAYS GRID ===== */
 .days-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 20px;
 }
 .day-card {
@@ -814,86 +761,94 @@ export default {
   font-style: italic;
 }
 
-/* ===== TIME SLOTS LIST ===== */
+/* ===== COMPACT TIME SLOT LAYOUT ===== */
 .time-slots-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .time-slot-item {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px 10px;
+  transition: all 0.2s ease;
 }
 .time-slot-item.booked-slot {
   background: #fef2f2;
   border-color: #fecaca;
+}
+.time-slot-item.available-slot {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.time-slot-item.unavailable-slot {
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 .time-slot-item.has-error {
   border-color: #f87171;
   background: #fff1f1;
 }
 
-/* === BOOKED SLOT — SINGLE LINE === */
-.booked-slot-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
-}
-.booked-time {
-  font-weight: 600;
-  color: #1e40af;
-  background: #eff6ff;
-  padding: 4px 10px;
-  border-radius: 6px;
-  min-width: 130px;
-  text-align: center;
-  font-size: 0.95rem;
-}
-.booked-badge {
-  background: #dc2626;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: bold;
-  white-space: nowrap;
-}
-.customer-info {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: #fee2e2;
-  color: #7f1d1d;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-/* === AVAILABLE SLOT — SINGLE LINE === */
-.available-slot-content {
+/* COMPACT SINGLE LINE CONTAINER */
+.slot-compact-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
+  flex-wrap: nowrap;
 }
-.time-inputs-group {
+
+/* TIME RANGE COMPACT - ENSURE TIMES ARE ALWAYS VISIBLE */
+.time-range-compact {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex: 1;
+  min-width: 160px;
+}
+.slot-icon {
+  color: #64748b;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.booked-slot .slot-icon {
+  color: #dc2626;
+}
+.available-slot .slot-icon {
+  color: #22c55e;
+}
+.unavailable-slot .slot-icon {
+  color: #94a3b8;
+}
+.booked-time-text {
+  font-weight: 600;
+  color: #1e40af;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  min-width: 120px;
+}
+.edit-time-range {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 140px;
 }
 .time-input {
-  width: 90px;
+  width: 75px;
+  min-width: 75px;
   padding: 6px 8px;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
   text-align: center;
   font-family: 'Inter', monospace;
   color: #1e40af;
+  background: white;
+  box-sizing: border-box;
 }
 .time-input:focus {
   outline: none;
@@ -902,21 +857,57 @@ export default {
 }
 .time-separator {
   color: #64748b;
-  font-weight: 500;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  padding: 0 2px;
   white-space: nowrap;
 }
-.slot-controls {
+
+/* STATUS INDICATOR COMPACT */
+.status-indicator-compact {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
-.availability-toggle {
-  position: relative;
+.booked-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   display: inline-block;
-  width: 42px;
-  height: 22px;
 }
-.availability-toggle input {
+.booked-dot {
+  background: #dc2626;
+}
+.customer-compact {
+  background: #fee2e2;
+  color: #dc2626;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+/* SIMPLE TOGGLE SWITCH (NO TEXT - COLOR ONLY) */
+.toggle-container {
+  flex-shrink: 0;
+}
+.toggle-switch {
+  display: inline-block;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+.toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
@@ -928,30 +919,43 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e1;
-  transition: .4s;
+  background-color: #ef4444;
+  transition: .3s;
   border-radius: 12px;
 }
 .toggle-slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
+  height: 18px;
+  width: 18px;
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .4s;
+  transition: .3s;
   border-radius: 50%;
 }
-.availability-toggle input:checked + .toggle-slider {
+.toggle-switch input:checked + .toggle-slider {
   background-color: #22c55e;
 }
-.availability-toggle input:checked + .toggle-slider:before {
+.toggle-switch input:checked + .toggle-slider:before {
   transform: translateX(20px);
 }
-.btn-remove-slot {
-  width: 26px;
-  height: 26px;
+
+/* ACTIONS COMPACT */
+.actions-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.error-indicator {
+  color: #dc2626;
+  font-size: 0.85rem;
+  cursor: help;
+}
+.remove-btn-compact {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #fee2e2;
   color: #dc2626;
@@ -960,44 +964,41 @@ export default {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  padding: 0;
 }
-.btn-remove-slot:hover:not(:disabled) {
+.remove-btn-compact:hover:not(:disabled) {
   background: #fecaca;
   transform: scale(1.05);
 }
-.btn-remove-slot:disabled {
-  opacity: 0.5;
+.remove-btn-compact:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
   transform: none;
 }
-.slot-error {
-  color: #dc2626;
-  font-size: 0.85rem;
-  margin-top: 6px;
-  padding: 4px 8px;
-  background: #fee2e2;
-  border-radius: 4px;
-}
 
-/* ===== ADD SLOT BUTTON ===== */
-.btn-add-slot {
+/* ===== ADD SLOT BUTTON COMPACT ===== */
+.btn-add-slot-compact {
   width: 100%;
   padding: 8px;
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #475569;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 8px;
+  transition: all 0.2s ease;
 }
-.btn-add-slot:hover:not(:disabled) {
+.btn-add-slot-compact:hover:not(:disabled) {
   background: #e2e8f0;
+  border-color: #94a3b8;
 }
 
 /* ===== ACTION BUTTONS ===== */
@@ -1025,6 +1026,7 @@ export default {
   border: none;
   font-size: 0.95rem;
   min-height: 42px;
+  transition: all 0.2s ease;
 }
 .btn-secondary {
   background: #f1f5f9;
@@ -1052,39 +1054,236 @@ export default {
   cursor: not-allowed;
 }
 
-/* ===== RESPONSIVE TWEAKS ===== */
-@media (max-width: 768px) {
-  .days-grid {
-    grid-template-columns: 1fr;
+/* ===== RESPONSIVE DESIGN - FIX MOBILE BREAKING ===== */
+
+/* Desktop (≥768px) - Ensure everything fits */
+@media (min-width: 768px) {
+  .slot-compact-line {
+    gap: 12px;
   }
-  .available-slot-content,
-  .booked-slot-content {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .time-text {
-    font-size: 0.85rem;
-    padding: 4px 8px;
-    min-width: 100px;
+  .time-range-compact {
+    min-width: 170px;
   }
   .time-input {
     width: 80px;
-    padding: 6px 7px;
+    min-width: 80px;
+  }
+  .booked-time-text {
+    min-width: 130px;
+  }
+}
+
+/* Tablet (480px-768px) - Adjust for medium screens */
+@media (max-width: 768px) and (min-width: 480px) {
+  .days-grid {
+    grid-template-columns: 1fr;
+  }
+  .slot-compact-line {
+    gap: 8px;
+  }
+  .time-range-compact {
+    min-width: 160px;
+  }
+  .time-input {
+    width: 75px;
+    min-width: 75px;
+    padding: 5px 6px;
     font-size: 0.85rem;
   }
-  .time-separator {
+  .booked-time-text {
+    font-size: 0.85rem;
+    min-width: 120px;
+  }
+}
+
+/* Mobile (<480px) - PREVENT BREAKING, KEEP TIMES VISIBLE */
+@media (max-width: 480px) {
+  .time-slots-container {
+    padding: 12px;
+  }
+  
+  .weekly-schedule-section {
+    padding: 16px;
+  }
+  
+  .days-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .day-card {
+    padding: 14px;
+  }
+  
+  /* CRITICAL: PREVENT BREAKING, KEEP SINGLE LINE */
+  .slot-compact-line {
+    gap: 6px;
+    align-items: center;
+    min-width: 100%;
+  }
+  
+  /* ENSURE TIME INPUTS DON'T BREAK */
+  .time-range-compact {
+    min-width: 150px;
+    gap: 4px;
+  }
+  
+  .edit-time-range {
+    min-width: 140px;
+    gap: 2px;
+  }
+  
+  .time-input {
+    width: 68px;
+    min-width: 68px;
+    padding: 5px 4px;
     font-size: 0.85rem;
   }
-  .btn {
-    width: 100%;
-    justify-content: center;
+  
+  /* Ensure "12:00" is fully visible */
+  .time-input::-webkit-datetime-edit-hour-field,
+  .time-input::-webkit-datetime-edit-minute-field {
+    padding: 0;
+    margin: 0;
   }
-  .action-buttons {
-    flex-direction: column;
+  
+  .time-input::-webkit-datetime-edit {
+    padding: 0;
   }
-  .primary-actions {
-    width: 100%;
-    flex-direction: column;
+  
+  .booked-time-text {
+    font-size: 0.85rem;
+    min-width: 110px;
+  }
+  
+  /* Smaller toggle without text */
+  .toggle-switch {
+    width: 40px;
+    height: 22px;
+  }
+  
+  .toggle-slider:before {
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+  }
+  
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(18px);
+  }
+  
+  .customer-compact {
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+  }
+  
+  .actions-compact {
+    gap: 4px;
+  }
+  
+  .remove-btn-compact {
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Extra Small Mobile (<360px) - STILL NO BREAKING */
+@media (max-width: 360px) {
+  /* FORCE SINGLE LINE - NO BREAKING */
+  .slot-compact-line {
+    gap: 4px;
+  }
+  
+  .time-range-compact {
+    min-width: 140px;
+  }
+  
+  .time-input {
+    width: 65px;
+    min-width: 65px;
+    padding: 4px 3px;
+    font-size: 0.8rem;
+  }
+  
+  .booked-time-text {
+    font-size: 0.8rem;
+    min-width: 105px;
+  }
+  
+  .toggle-switch {
+    width: 38px;
+    height: 20px;
+  }
+  
+  .toggle-slider:before {
+    height: 14px;
+    width: 14px;
+  }
+  
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(18px);
+  }
+}
+
+/* ENSURE NO BREAKING - CRITICAL RULES */
+.slot-compact-line {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+.time-range-compact,
+.edit-time-range {
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+/* Prevent time inputs from being cut off */
+.time-input {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* For Firefox - ensure time input shows full value */
+.time-input[type="time"] {
+  -moz-appearance: textfield;
+}
+
+/* Hover effects */
+.time-slot-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transform: translateY(-1px);
+}
+
+/* Tooltip for toggle to show availability state */
+.toggle-switch[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 100;
+  margin-bottom: 5px;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .slot-compact-line,
+  .time-slot-item,
+  .remove-btn-compact,
+  .toggle-slider,
+  .toggle-slider:before {
+    transition: none;
   }
 }
 </style>

@@ -1,4 +1,4 @@
-<!-- src/pages/AboutPage.vue -->
+<!-- src/pages/About.vue -->
 <template>
   <div class="about-page font-poppins">
     <!-- Hero Section -->
