@@ -3,31 +3,47 @@ import axios from "axios";
 
 // ✅ SMART URL CONFIGURATION
 const getBaseURL = () => {
-  if (import.meta.env.DEV) {
+  const hostname = window.location.hostname;
+  
+  // Local development - use proxy
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('192.168.')) {
     console.log("🚀 Development mode: Using proxy /api");
     return "/api";
-  } else {
-    const productionURL = "https://infinity-booking-backend1-1.onrender.com/infinity-booking";
-    console.log("🌐 Production mode: Using direct URL:", productionURL);
-    return productionURL;
+  } 
+  // Vercel deployment - use direct URL but with CORS-safe headers
+  else if (hostname.includes('vercel.app') || hostname.includes('provider-board')) {
+    console.log("🌐 Production (Vercel): Using direct backend URL");
+    return "https://infinity-booking-backend1-1.onrender.com/infinity-booking";
+  }
+  // Fallback
+  else {
+    console.log("⚡ Unknown environment, using direct URL");
+    return "https://infinity-booking-backend1-1.onrender.com/infinity-booking";
   }
 };
 
 const http = axios.create({
   baseURL: getBaseURL(),
   timeout: 15000,
+  // ⚠️ REMOVE problematic headers that cause CORS issues
   headers: {
     "Content-Type": "application/json",
+    "Accept": "application/json"
+    // ⚠️ DO NOT include 'Pragma', 'Cache-Control', or other headers that trigger preflight
   },
 });
 
 // ✅ Enhanced request logging
 http.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("provider_token");
+    const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // ⚠️ Remove any problematic headers from specific requests
+    delete config.headers['Pragma'];
+    delete config.headers['Cache-Control'];
     
     console.log(`📤 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     
@@ -36,7 +52,7 @@ http.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Enhanced error logging
+// ✅ Enhanced error logging with CORS detection
 http.interceptors.response.use(
   (response) => {
     console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - Success`);
@@ -51,6 +67,16 @@ http.interceptors.response.use(
       message: error.message,
       code: error.code
     });
+
+    // Check for CORS error
+    if (error.message && (error.message.includes('CORS') || error.message.includes('cross-origin'))) {
+      console.error("⚠️ CORS ERROR DETECTED!");
+      return Promise.reject({ 
+        message: "CORS Error: The server is blocking cross-origin requests. This is a backend configuration issue.",
+        code: 'CORS_ERROR',
+        details: `Request from: ${window.location.origin} to: ${error.config?.baseURL}`
+      });
+    }
 
     if (error.code === 'ECONNABORTED') {
       return Promise.reject({ 
@@ -72,8 +98,4 @@ http.interceptors.response.use(
   }
 );
 
-// ✅ SIMPLE EXPORT - NO COMPLEX MODULES!
-// Your components will continue using:
-// import http from "@/api/index.js";
-// http.post("/services/123/slots", data)
 export default http;

@@ -664,7 +664,41 @@
               </div>
             </div>
           </div>
-
+<!-- Error State -->
+<div v-else-if="error" class="error-container">
+  <div class="error-content">
+    <div class="error-icon">
+      <i class="fa-solid fa-exclamation-triangle"></i>
+    </div>
+    <h3>Unable to Load Bookings</h3>
+    <p>{{ error }}</p>
+    
+    <div class="error-details">
+      <p><strong>Status:</strong> {{ errorStatus }}</p>
+      <p><strong>Provider PID:</strong> {{ currentProviderId }}</p>
+      <p><strong>Environment:</strong> {{ isDeployed ? 'Deployed (Vercel)' : 'Local' }}</p>
+      <p><strong>Data Source:</strong> {{ usingSampleData ? 'Sample Data' : 'Real API' }}</p>
+    </div>
+    
+    <div v-if="errorStatus.includes('CORS')" class="cors-help">
+      <h4><i class="fa-solid fa-shield"></i> CORS Issue Detected</h4>
+      <p>The backend server is blocking cross-origin requests from Vercel.</p>
+      <p>Showing sample data for demonstration. Real bookings will load when CORS is fixed.</p>
+    </div>
+    
+    <div class="error-actions">
+      <button class="btn btn-primary" @click="loadBookings">
+        <i class="fa-solid fa-rotate"></i> Try Again
+      </button>
+      <button class="btn btn-outline" @click="testConnection">
+        <i class="fa-solid fa-plug"></i> Test Connection
+      </button>
+      <button class="btn btn-outline" @click="checkProviderStatus">
+        <i class="fa-solid fa-user-check"></i> Check Status
+      </button>
+    </div>
+  </div>
+</div>
           <!-- Additional Information -->
           <div class="details-section" v-if="selectedBooking.notes || selectedBooking.originalData?.specialRequirements">
             <h5><i class="fa-solid fa-note-sticky"></i> Additional Information</h5>
@@ -706,7 +740,7 @@
     </div>
   </div>
 </template>
-
+  
 <script>
 import { ref, computed, onMounted } from "vue";
 import http from "@/api/index.js";
@@ -725,7 +759,7 @@ export default {
     const statusFilter = ref("all");
     const dateFilter = ref("all");
     const viewMode = ref("list");
-    const selectedPeriod = ref("all"); // all, today, yesterday, week, month, custom
+    const selectedPeriod = ref("all");
     const currentPage = ref(1);
     const itemsPerPage = ref(10);
     const selectedBooking = ref(null);
@@ -734,8 +768,9 @@ export default {
     const showOriginalData = ref(false);
     const showDebug = ref(false);
     const usingSampleData = ref(false);
+    const isDeployed = ref(window.location.hostname.includes('vercel.app'));
 
-    // Timeline periods - modified for filtering only
+    // Timeline periods
     const timelinePeriods = ref([
       { id: "today", label: "Today", icon: "fa-solid fa-calendar-day" },
       { id: "yesterday", label: "Yesterday", icon: "fa-solid fa-calendar-minus" },
@@ -754,22 +789,20 @@ export default {
       revenue: 0
     });
 
-    // Known provider PIDs - MANUAL MAPPING
+    // Known provider PIDs
     const knownProviderPids = {
-      "691e1659e304653542a825d5": "PROV-1763579481598-1GBEN", // hayelom
-      "692b3c78d399bc41c3712380": "PROV-1764441208540-C269P"  // tig-tg
+      "691e1659e304653542a825d5": "PROV-1763579481598-1GBEN",
+      "692b3c78d399bc41c3712380": "PROV-1764441208540-C269P"
     };
 
     // ==================== COMPUTED PROPERTIES ====================
 
-    // Get label for selected period
     const selectedPeriodLabel = computed(() => {
       if (selectedPeriod.value === "all") return "";
       const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
       return period ? period.label : "";
     });
 
-    // Filter bookings by timeline period
     const timelineFilteredBookings = computed(() => {
       if (selectedPeriod.value === "all" || !selectedPeriod.value) {
         return bookings.value;
@@ -799,7 +832,6 @@ export default {
             return bookingDate.getMonth() === today.getMonth() && 
                    bookingDate.getFullYear() === today.getFullYear();
           case "custom":
-            // For custom, show all (you can implement custom date range later)
             return true;
           default:
             return true;
@@ -807,7 +839,6 @@ export default {
       });
     });
 
-    // Combined filters (search + status + date + timeline)
     const filteredBookings = computed(() => {
       let filtered = timelineFilteredBookings.value;
 
@@ -827,7 +858,7 @@ export default {
         filtered = filtered.filter(booking => booking.status === statusFilter.value);
       }
 
-      // Date filter (from the date dropdown)
+      // Date filter
       if (dateFilter.value !== 'all') {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -865,7 +896,6 @@ export default {
       return filtered;
     });
 
-    // Alias for display bookings
     const displayBookings = computed(() => filteredBookings.value);
 
     const paginatedBookings = computed(() => {
@@ -882,7 +912,7 @@ export default {
 
     const selectTimelinePeriod = (periodId) => {
       selectedPeriod.value = periodId;
-      currentPage.value = 1; // Reset to first page when changing period
+      currentPage.value = 1;
     };
 
     const clearTimelinePeriod = () => {
@@ -890,31 +920,8 @@ export default {
       currentPage.value = 1;
     };
 
-    // ==================== UTILITY FUNCTIONS ====================
+    // ==================== CORS-FRIENDLY LOADING ====================
 
-    // Retry mechanism with exponential backoff
-    const retryWithBackoff = async (fn, maxRetries = 3, initialDelay = 1000) => {
-      let lastError;
-      
-      for (let i = 0; i < maxRetries; i++) {
-        try {
-          return await fn();
-        } catch (err) {
-          lastError = err;
-          
-          if (i === maxRetries - 1) break; // Last retry
-          
-          const delay = initialDelay * Math.pow(2, i); // Exponential backoff
-          console.log(`🔄 Retry ${i + 1}/${maxRetries} in ${delay}ms...`);
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-      
-      throw lastError;
-    };
-
-    // Get Provider ID - SIMPLE & RELIABLE
     const getProviderId = () => {
       try {
         const loggedProvider = localStorage.getItem("loggedProvider");
@@ -924,22 +931,17 @@ export default {
         }
         
         const providerData = JSON.parse(loggedProvider);
-        console.log("🔍 Current provider:", providerData.fullname, "ID:", providerData._id);
         
-        // Method 1: Check if PID exists in localStorage
+        // Check if PID exists in localStorage
         const existingPid = providerData.pid || providerData.providerProfile?.pid;
         if (existingPid) {
-          console.log("✅ Found PID in localStorage:", existingPid);
           currentProviderId.value = existingPid;
           return existingPid;
         }
         
-        // Method 2: Use manual mapping
+        // Use manual mapping
         const mappedPid = knownProviderPids[providerData._id];
         if (mappedPid) {
-          console.log("🎯 Using mapped PID:", mappedPid);
-          
-          // Update localStorage with PID for future use
           const updatedData = { ...providerData, pid: mappedPid };
           localStorage.setItem("loggedProvider", JSON.stringify(updatedData));
           
@@ -956,11 +958,9 @@ export default {
       }
     };
 
-    // ==================== DATA PROCESSING FUNCTIONS ====================
+    // ==================== DATA PROCESSING ====================
 
-    // ENHANCED CUSTOMER DATA EXTRACTION with admin details
     const extractCustomerData = (booking) => {
-      // Check if this is an admin-created booking (no customer data)
       const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
       
       if (isAdminBooking) {
@@ -971,7 +971,6 @@ export default {
           phone: booking.adminPhone || '',
           location: booking.adminLocation || '',
           isAdminBooking: true,
-          // Preserve original admin details
           originalAdminData: {
             adminName: booking.adminName || booking.createdByName || 'Admin User',
             adminEmail: booking.adminEmail || '',
@@ -981,7 +980,6 @@ export default {
         };
       }
       
-      // Check for customer object (standard customer booking)
       if (booking.customer && typeof booking.customer === 'object') {
         return {
           customerId: booking.customer._id || booking.customer.id,
@@ -990,12 +988,10 @@ export default {
           phone: booking.customer.phone || '',
           location: booking.customer.location || booking.customer.address || '',
           isAdminBooking: false,
-          // Store original customer object for details view
           originalCustomer: booking.customer
         };
       }
       
-      // Check for direct customer fields
       if (booking.customerName || booking.customerEmail) {
         return {
           customerId: booking.customerId || booking.userId,
@@ -1007,7 +1003,6 @@ export default {
         };
       }
       
-      // Check for user object (alternative naming)
       if (booking.user && typeof booking.user === 'object') {
         return {
           customerId: booking.user._id || booking.user.id,
@@ -1020,7 +1015,6 @@ export default {
         };
       }
       
-      // If no customer data found at all, treat as admin booking
       return {
         customerId: null,
         fullname: 'Admin',
@@ -1037,11 +1031,10 @@ export default {
       };
     };
 
-    // ENHANCE BOOKING DISPLAY with all details
     const enhanceBookingDisplay = (booking, customerData) => {
       const service = booking.service || {};
       
-      const enhancedBooking = {
+      return {
         _id: booking._id || booking.bookingId || booking.id,
         customerId: customerData.customerId,
         providerId: booking.providerId || booking.provider?._id,
@@ -1060,39 +1053,10 @@ export default {
         amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
         createdAt: booking.createdAt || booking.bookingTime,
         notes: booking.notes || booking.specialRequirements,
-        // Preserve ALL original data for details view
-        originalData: {
-          ...booking,
-          // Customer/Admin details
-          adminName: customerData.originalAdminData?.adminName,
-          adminEmail: customerData.originalAdminData?.adminEmail,
-          adminPhone: customerData.originalAdminData?.adminPhone,
-          adminId: customerData.originalAdminData?.adminId,
-          customer: customerData.originalCustomer,
-          // Payment details
-          paymentStatus: booking.paymentStatus || booking.payment?.status,
-          paymentMethod: booking.paymentMethod || booking.payment?.method,
-          paymentAmount: booking.paymentAmount || booking.payment?.amount,
-          // Service details
-          serviceDetails: service.description || service.details,
-          servicePrice: service.price,
-          serviceDuration: service.duration,
-          // Provider details
-          providerName: booking.provider?.fullname || booking.provider?.name,
-          providerEmail: booking.provider?.email,
-          providerPhone: booking.provider?.phone,
-          // Booking metadata
-          bookingMethod: booking.bookingMethod || (customerData.isAdminBooking ? 'admin' : 'online'),
-          source: booking.source || 'direct',
-          // Special requirements
-          specialRequirements: booking.specialRequirements
-        }
+        originalData: booking
       };
-
-      return enhancedBooking;
     };
 
-    // PROCESS BOOKINGS
     const processBookings = (apiBookings) => {
       if (!apiBookings) {
         console.warn("⚠️ No data received from API");
@@ -1101,7 +1065,6 @@ export default {
       
       let bookingsArray = [];
       
-      // Handle different response structures
       if (Array.isArray(apiBookings)) {
         bookingsArray = apiBookings;
       } else if (apiBookings.bookings && Array.isArray(apiBookings.bookings)) {
@@ -1115,13 +1078,11 @@ export default {
 
       console.log(`📊 Processing ${bookingsArray.length} bookings...`);
 
-      // Process each booking
       const processedBookings = bookingsArray.map(booking => {
         const customerData = extractCustomerData(booking);
         return enhanceBookingDisplay(booking, customerData);
       });
 
-      // Sort by date (most recent first)
       processedBookings.sort((a, b) => {
         const dateA = new Date(a.bookingDate || a.createdAt);
         const dateB = new Date(b.bookingDate || b.createdAt);
@@ -1131,190 +1092,29 @@ export default {
       return processedBookings;
     };
 
-    // ==================== ERROR HANDLING ====================
+    // ==================== CORS-FRIENDLY API CALL ====================
 
-    // Enhanced error handling with timeout support
-    const handleApiError = (err) => {
-      if (err.response) {
-        const status = err.response.status;
-        errorStatus.value = `${status} ${err.response.statusText}`;
-        
-        if (status === 403) {
-          error.value = "Access denied. Please check your provider permissions.";
-        } else if (status === 404) {
-          error.value = "Bookings endpoint not found. Please check your API configuration.";
-        } else if (status === 401) {
-          error.value = "Authentication required. Please login again.";
-        } else if (status === 500) {
-          error.value = "Server error. Please try again later.";
-        } else if (status === 504) {
-          error.value = "Gateway timeout. The server is taking too long to respond.";
-        } else {
-          error.value = `Server error: ${status}`;
-        }
-      } else if (err.request) {
-        errorStatus.value = "Network Error";
-        
-        if (err.code === 'ECONNABORTED') {
-          error.value = "Request timeout. The server is not responding. Please try again or check your internet connection.";
-        } else if (err.message?.includes('Network Error')) {
-          error.value = "Cannot connect to the server. Please check your internet connection.";
-        } else {
-          error.value = "Network error. Please check your connection and try again.";
-        }
-      } else {
-        errorStatus.value = "Client Error";
-        error.value = `Error: ${err.message}`;
-      }
-    };
-
-    // ==================== DATA LOADING FUNCTIONS ====================
-
-    // LOAD SAMPLE BOOKINGS FOR DEVELOPMENT/TESTING
-    const loadSampleBookings = async (providerId) => {
-      console.log("📋 Loading sample bookings for development");
-      
-      usingSampleData.value = true;
-      
-      // Create sample bookings data with various dates for filtering
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const lastWeek = new Date(today);
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      
-      const sampleBookings = [
-        {
-          _id: "sample_1",
-          customer: {
-            _id: "cust_1",
-            fullname: "John Smith",
-            email: "john@example.com",
-            phone: "+1234567890",
-            location: "New York"
-          },
-          service: {
-            name: "Haircut & Styling",
-            category: { name: "Hair Services" },
-            price: 45
-          },
-          bookingDate: today.toISOString().split('T')[0], // Today
-          startTime: "14:00",
-          endTime: "15:00",
-          status: "confirmed",
-          totalPrice: 45,
-          createdAt: yesterday.toISOString(),
-          notes: "Regular customer"
-        },
-        {
-          _id: "sample_2",
-          createdBy: "admin",
-          adminName: "Store Manager",
-          adminEmail: "manager@store.com",
-          adminPhone: "+1234567891",
-          service: {
-            name: "Beard Trim",
-            category: { name: "Grooming" },
-            price: 25
-          },
-          bookingDate: today.toISOString().split('T')[0], // Today
-          startTime: "16:00",
-          endTime: "16:30",
-          status: "pending",
-          totalPrice: 25,
-          createdAt: today.toISOString(),
-          notes: "Walk-in customer"
-        },
-        {
-          _id: "sample_3",
-          customer: {
-            _id: "cust_2",
-            fullname: "Sarah Johnson",
-            email: "sarah@example.com",
-            phone: "+1234567892",
-            location: "Brooklyn"
-          },
-          service: {
-            name: "Hair Color",
-            category: { name: "Hair Services" },
-            price: 85
-          },
-          bookingDate: yesterday.toISOString().split('T')[0], // Yesterday
-          startTime: "11:00",
-          endTime: "13:00",
-          status: "pending",
-          totalPrice: 85,
-          createdAt: lastWeek.toISOString(),
-          notes: "Special color request"
-        },
-        {
-          _id: "sample_4",
-          createdBy: "admin",
-          adminName: "Admin User",
-          adminEmail: "admin@company.com",
-          adminPhone: "+1234567893",
-          service: {
-            name: "Kids Haircut",
-            category: { name: "Children" },
-            price: 30
-          },
-          bookingDate: lastWeek.toISOString().split('T')[0], // Last week
-          startTime: "10:00",
-          endTime: "10:45",
-          status: "confirmed",
-          totalPrice: 30,
-          createdAt: lastWeek.toISOString(),
-          notes: "First time customer"
-        },
-        {
-          _id: "sample_5",
-          customer: {
-            _id: "cust_3",
-            fullname: "Michael Brown",
-            email: "michael@example.com",
-            phone: "+1234567894",
-            location: "Queens"
-          },
-          service: {
-            name: "Hair Wash & Style",
-            category: { name: "Hair Services" },
-            price: 35
-          },
-          bookingDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0], // This month
-          startTime: "09:00",
-          endTime: "09:45",
-          status: "completed",
-          totalPrice: 35,
-          createdAt: lastWeek.toISOString(),
-          notes: "Regular appointment"
-        }
-      ];
-
-      // Process the sample bookings
-      const processedBookings = processBookings(sampleBookings);
-      bookings.value = processedBookings;
-      
-      // Cache the sample data
-      try {
-        localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
-          bookings: processedBookings,
-          timestamp: Date.now(),
-          isSample: true
-        }));
-      } catch (cacheErr) {
-        console.log("❌ Cache save error:", cacheErr);
+    const makeCorsSafeRequest = async (url, options = {}) => {
+      // For deployed environment, use minimal headers to avoid CORS preflight
+      if (isDeployed.value) {
+        const safeOptions = {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            // DO NOT include Pragma, Cache-Control, or other headers that trigger preflight
+          }
+        };
+        return await http.get(url, safeOptions);
       }
       
-      console.log(`✅ Loaded ${processedBookings.length} sample bookings`);
-      calculateStats();
-      
-      // Show info message
-      error.value = "Connected to sample data (server timeout)";
-      errorStatus.value = "Development Mode";
+      // For local development, use normal headers
+      return await http.get(url, options);
     };
 
-    // ENHANCED LOAD BOOKINGS with timeout handling and retries
-    const loadBookings = async (useRetry = true) => {
+    // ==================== LOAD BOOKINGS (FIXED FOR DEPLOYMENT) ====================
+
+    const loadBookings = async () => {
       const providerId = getProviderId();
       
       if (!providerId) {
@@ -1328,11 +1128,11 @@ export default {
       errorStatus.value = "";
       usingSampleData.value = false;
 
-      // Clear any existing progress interval
       let progressInterval;
 
       try {
         console.log("🚀 Loading bookings for provider:", providerId);
+        console.log("🌐 Environment:", isDeployed.value ? "Deployed (Vercel)" : "Local");
 
         // Progress simulation
         progressInterval = setInterval(() => {
@@ -1341,57 +1141,42 @@ export default {
           }
         }, 200);
 
-        // Try to load from cache first if we're retrying
-        if (useRetry) {
-          try {
-            const cachedBookings = localStorage.getItem(`cachedBookings_${providerId}`);
-            if (cachedBookings) {
-              const cachedData = JSON.parse(cachedBookings);
-              // Use cache if it's less than 5 minutes old
-              if (Date.now() - cachedData.timestamp < 300000) { // 5 minutes
-                console.log("🔄 Using cached bookings data");
-                bookings.value = cachedData.bookings;
-                calculateStats();
-                loading.value = false;
-                clearInterval(progressInterval);
-                loadingProgress.value = 100;
-                setTimeout(() => { loadingProgress.value = 0; }, 500);
-                return;
-              }
+        // Try to load from cache first
+        try {
+          const cachedBookings = localStorage.getItem(`cachedBookings_${providerId}`);
+          if (cachedBookings) {
+            const cachedData = JSON.parse(cachedBookings);
+            if (Date.now() - cachedData.timestamp < 300000) { // 5 minutes
+              console.log("🔄 Using cached bookings data");
+              bookings.value = cachedData.bookings;
+              calculateStats();
+              loading.value = false;
+              clearInterval(progressInterval);
+              loadingProgress.value = 100;
+              setTimeout(() => { loadingProgress.value = 0; }, 500);
+              return;
             }
-          } catch (cacheErr) {
-            console.log("❌ Cache load error:", cacheErr);
           }
+        } catch (cacheErr) {
+          console.log("❌ Cache load error:", cacheErr);
         }
 
-        // API call with custom timeout
+        // API call with CORS-safe configuration
         const endpoint = `/bookings/provider/${providerId}`;
         currentEndpoint.value = endpoint;
         
         console.log("📡 Calling endpoint:", endpoint);
         
-        // Use retry mechanism if enabled
-        const apiCall = async () => {
-          return await http.get(endpoint, {
-            timeout: 10000, // Reduced to 10 seconds for faster feedback
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-        };
-
-        const response = useRetry 
-          ? await retryWithBackoff(apiCall, 2, 1000)
-          : await apiCall();
+        // Use CORS-safe request
+        const response = await makeCorsSafeRequest(endpoint, {
+          timeout: 10000
+        });
         
         clearInterval(progressInterval);
         loadingProgress.value = 100;
 
-        // If we get here without timeout, process the response
         console.log("✅ API Response received:", response.data);
         
-        // Process the data
         const processedBookings = processBookings(response.data);
         bookings.value = processedBookings;
         
@@ -1410,25 +1195,33 @@ export default {
         calculateStats();
 
       } catch (err) {
-        console.error("❌ API Error:", err);
+        console.error("❌ Load Error:", err);
         
-        // Clear the progress interval if it's still running
         if (progressInterval) {
           clearInterval(progressInterval);
         }
         
-        // Handle timeout specifically
-        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-          errorStatus.value = "Timeout Error";
-          error.value = "The server is taking too long to respond. The booking system might be busy or experiencing high traffic.";
+        // Specific CORS error handling
+        if (err.message?.includes('CORS') || err.code === 'CORS_ERROR') {
+          errorStatus.value = "CORS Error";
+          error.value = "Server is blocking cross-origin requests. ";
           
-          // Fall back to sample data
-          await loadSampleBookings(providerId);
-          return;
+          // Try alternative fetch method for deployed environment
+          if (isDeployed.value) {
+            error.value += "Trying alternative method...";
+            await tryAlternativeFetch(providerId);
+            return;
+          }
         }
         
-        // Handle 403 as "no bookings" case
-        if (err.response?.status === 403) {
+        // Handle other errors
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          errorStatus.value = "Timeout Error";
+          error.value = "The server is taking too long to respond.";
+        } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+          errorStatus.value = "Network Error";
+          error.value = "Cannot connect to server. Please check your connection.";
+        } else if (err.response?.status === 403) {
           const errorMessage = err.response?.data?.message || err.message || '';
           if (errorMessage.includes("Providers can only access their own bookings")) {
             console.log("✅ No bookings found for this provider");
@@ -1437,10 +1230,19 @@ export default {
             calculateStats();
             return;
           }
+          error.value = "Access denied. Please check your permissions.";
+          errorStatus.value = "403 Forbidden";
+        } else if (err.response?.status === 404) {
+          error.value = "Bookings endpoint not found.";
+          errorStatus.value = "404 Not Found";
+        } else {
+          error.value = err.message || "Unknown error occurred";
+          errorStatus.value = "API Error";
         }
         
-        // Handle other errors
-        handleApiError(err);
+        // Fall back to sample data
+        await loadSampleBookings(providerId);
+        
       } finally {
         loading.value = false;
         if (progressInterval) {
@@ -1450,9 +1252,136 @@ export default {
       }
     };
 
+    // ==================== ALTERNATIVE FETCH FOR CORS ISSUES ====================
+
+    const tryAlternativeFetch = async (providerId) => {
+      console.log("🔄 Trying alternative fetch (direct fetch API)...");
+      
+      try {
+        // Use fetch API directly with minimal headers
+        const response = await fetch(
+          `https://infinity-booking-backend1-1.onrender.com/infinity-booking/bookings/provider/${providerId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            mode: 'cors'
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ Alternative fetch succeeded");
+          
+          const processedBookings = processBookings(data);
+          bookings.value = processedBookings;
+          calculateStats();
+          
+          // Cache the data
+          localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
+            bookings: processedBookings,
+            timestamp: Date.now(),
+            isSample: false
+          }));
+          
+          error.value = "";
+          errorStatus.value = "";
+          return true;
+        } else {
+          throw new Error(`Fetch failed with status: ${response.status}`);
+        }
+      } catch (fetchErr) {
+        console.error("❌ Alternative fetch failed:", fetchErr);
+        await loadSampleBookings(providerId);
+        return false;
+      }
+    };
+
+    // ==================== SAMPLE DATA ====================
+
+    const loadSampleBookings = async (providerId) => {
+      console.log("📋 Loading sample bookings");
+      
+      usingSampleData.value = true;
+      
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const lastWeek = new Date(today);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      
+      const sampleBookings = [
+        {
+          _id: "sample_1_" + Date.now(),
+          customer: {
+            _id: "cust_1",
+            fullname: "John Smith",
+            email: "john@example.com",
+            phone: "+1234567890",
+            location: "New York"
+          },
+          service: {
+            name: "Haircut & Styling",
+            category: { name: "Hair Services" },
+            price: 45
+          },
+          bookingDate: today.toISOString().split('T')[0],
+          startTime: "14:00",
+          endTime: "15:00",
+          status: "confirmed",
+          totalPrice: 45,
+          createdAt: yesterday.toISOString(),
+          notes: "Regular customer"
+        },
+        {
+          _id: "sample_2_" + Date.now(),
+          createdBy: "admin",
+          adminName: "Store Manager",
+          adminEmail: "manager@store.com",
+          adminPhone: "+1234567891",
+          service: {
+            name: "Beard Trim",
+            category: { name: "Grooming" },
+            price: 25
+          },
+          bookingDate: today.toISOString().split('T')[0],
+          startTime: "16:00",
+          endTime: "16:30",
+          status: "pending",
+          totalPrice: 25,
+          createdAt: today.toISOString(),
+          notes: "Walk-in customer"
+        }
+      ];
+
+      const processedBookings = processBookings(sampleBookings);
+      bookings.value = processedBookings;
+      
+      try {
+        localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
+          bookings: processedBookings,
+          timestamp: Date.now(),
+          isSample: true
+        }));
+      } catch (cacheErr) {
+        console.log("❌ Cache save error:", cacheErr);
+      }
+      
+      console.log(`✅ Loaded ${processedBookings.length} sample bookings`);
+      calculateStats();
+      
+      if (isDeployed.value) {
+        error.value = "Using sample data (CORS issue with backend). Real bookings will load when CORS is fixed.";
+      } else {
+        error.value = "Using sample data (server issue).";
+      }
+      errorStatus.value = "Sample Data";
+    };
+
     // ==================== CORE FUNCTIONS ====================
 
-    // Calculate duration
     const calculateDuration = (startTime, endTime) => {
       if (!startTime || !endTime) return null;
       try {
@@ -1464,14 +1393,13 @@ export default {
       }
     };
 
-    // Calculate statistics
     const calculateStats = () => {
       if (bookings.value.length === 0) {
         stats.value = { totalBookings: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, revenue: 0 };
         return;
       }
 
-      const calculatedStats = {
+      stats.value = {
         totalBookings: bookings.value.length,
         pending: bookings.value.filter(b => b.status === 'pending').length,
         confirmed: bookings.value.filter(b => b.status === 'confirmed').length,
@@ -1482,62 +1410,27 @@ export default {
           .reduce((sum, booking) => sum + (parseFloat(booking.amount) || 0), 0)
           .toFixed(2)
       };
-
-      stats.value = calculatedStats;
     };
 
-    // Check provider status
     const checkProviderStatus = () => {
       const providerData = JSON.parse(localStorage.getItem("loggedProvider") || "{}");
       
       let statusMessage = `🔍 Provider Status Check:\n\n`;
       statusMessage += `👤 Name: ${providerData.fullname}\n`;
       statusMessage += `📧 Email: ${providerData.email}\n`;
-      statusMessage += `🎯 Role: ${providerData.role}\n`;
-      statusMessage += `🆔 MongoDB ID: ${providerData._id}\n`;
       statusMessage += `🎫 Provider PID: ${currentProviderId.value}\n`;
-      statusMessage += `📍 Location: ${providerData.location || 'Not set'}\n`;
-      statusMessage += `📊 Service Categories: ${providerData.serviceCategoryNames?.join(', ') || 'Not set'}\n\n`;
+      statusMessage += `🌐 Environment: ${isDeployed.value ? 'Deployed (Vercel)' : 'Local'}\n`;
+      statusMessage += `📊 Data Source: ${usingSampleData.value ? 'Sample Data' : 'Real API'}\n\n`;
       statusMessage += `📈 Booking Statistics:\n`;
       statusMessage += `   Total Bookings: ${stats.value.totalBookings}\n`;
       statusMessage += `   Pending: ${stats.value.pending} | Confirmed: ${stats.value.confirmed}\n`;
-      statusMessage += `   Completed: ${stats.value.completed} | Revenue: $${stats.value.revenue}\n\n`;
+      statusMessage += `   Completed: ${stats.value.completed} | Revenue: $${stats.value.revenue}\n`;
       
-      // Add admin booking info
-      const adminBookings = bookings.value.filter(b => b.isAdminBooking).length;
-      const customerBookings = bookings.value.filter(b => !b.isAdminBooking).length;
-      statusMessage += `📋 Booking Types:\n`;
-      statusMessage += `   Admin Bookings: ${adminBookings}\n`;
-      statusMessage += `   Customer Bookings: ${customerBookings}\n\n`;
-      
-      if (bookings.value.length === 0) {
-        statusMessage += `💡 No bookings yet. Share your services to get started!`;
-      } else {
-        statusMessage += `✅ Booking system is working perfectly!`;
+      if (error.value) {
+        statusMessage += `\n⚠️ Error: ${error.value}`;
       }
       
       alert(statusMessage);
-    };
-
-    // View booking details modal
-    const viewBookingDetailsModal = (booking) => {
-      selectedBooking.value = booking;
-      showOriginalData.value = false;
-    };
-
-    // Close modal
-    const closeModal = () => {
-      selectedBooking.value = null;
-    };
-
-    // Promote services
-    const promoteServices = () => {
-      alert("🎯 Great idea! Share your booking link with potential clients to get more bookings.");
-    };
-
-    // View services
-    const viewServices = () => {
-      alert("Redirecting to your services page...");
     };
 
     // ==================== ACTION METHODS ====================
@@ -1560,6 +1453,7 @@ export default {
         calculateStats();
       } catch (err) {
         console.error('Error confirming booking:', err);
+        alert("Failed to confirm booking. Please try again.");
       }
     };
 
@@ -1570,10 +1464,49 @@ export default {
         calculateStats();
       } catch (err) {
         console.error('Error completing booking:', err);
+        alert("Failed to complete booking. Please try again.");
       }
     };
 
-    // ==================== CUSTOMER DATA GETTERS ====================
+    const viewBookingDetailsModal = (booking) => {
+      selectedBooking.value = booking;
+      showOriginalData.value = false;
+    };
+
+    const closeModal = () => {
+      selectedBooking.value = null;
+    };
+
+    const promoteServices = () => {
+      alert("🎯 Share your booking link to get more bookings!");
+    };
+
+    const viewServices = () => {
+      alert("Redirecting to services page...");
+    };
+
+    const testConnection = async () => {
+      const providerId = getProviderId();
+      if (!providerId) return;
+      
+      try {
+        const testUrl = `https://infinity-booking-backend1-1.onrender.com/infinity-booking/bookings/provider/${providerId}`;
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+          alert(`✅ Connection test successful!\n\nServer is reachable but CORS might be blocking the request.\n\nStatus: ${response.status}\nURL: ${testUrl}`);
+        } else {
+          alert(`❌ Connection test failed:\n\nStatus: ${response.status}\nURL: ${testUrl}`);
+        }
+      } catch (err) {
+        alert(`❌ Connection test failed:\n\nError: ${err.message}\n\nThe server might be down.`);
+      }
+    };
+
+    // ==================== UTILITY GETTERS ====================
 
     const getCustomerName = (booking) => {
       if (booking.isAdminBooking) {
@@ -1596,31 +1529,20 @@ export default {
       return booking.customerPhone || '';
     };
 
-    const getCustomerLocation = (booking) => {
-      if (booking.isAdminBooking) {
-        return '';
-      }
-      return booking.customerLocation || '';
-    };
-
     const getServiceName = (booking) => {
       return booking.serviceName || 
              booking.originalData?.service?.name ||
-             booking.originalData?.service?.title ||
              'Unknown Service';
     };
 
     const getCategoryName = (booking) => {
       return booking.serviceCategory || 
              booking.originalData?.service?.category?.name ||
-             booking.originalData?.category?.name ||
              'General';
     };
 
     const getBookingAmount = (booking) => {
-      return parseFloat(booking.amount || 
-             booking.originalData?.totalPrice || 
-             booking.originalData?.price || 0).toFixed(2);
+      return parseFloat(booking.amount || 0).toFixed(2);
     };
 
     const formatStatus = (status) => {
@@ -1633,21 +1555,8 @@ export default {
       return statusMap[status] || status;
     };
 
-    const formatPaymentStatus = (status) => {
-      const statusMap = {
-        paid: 'Paid',
-        pending: 'Pending',
-        failed: 'Failed',
-        refunded: 'Refunded'
-      };
-      return statusMap[status] || status;
-    };
-
-    // ==================== UTILITY FUNCTIONS ====================
-
     const getInitials = (name) => {
       if (!name) return '??';
-      // For admin bookings, use 'AD' for admin
       if (name === 'Admin' || name.includes('Admin')) return 'AD';
       return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     };
@@ -1663,18 +1572,6 @@ export default {
         });
       } catch (err) {
         return 'Invalid Date';
-      }
-    };
-
-    const formatDateShort = (dateString) => {
-      if (!dateString) return '';
-      try {
-        return new Date(dateString).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric'
-        });
-      } catch (err) {
-        return '';
       }
     };
 
@@ -1726,15 +1623,7 @@ export default {
     // ==================== LIFECYCLE ====================
 
     onMounted(() => {
-      // Use retry mechanism with exponential backoff
-      retryWithBackoff(() => loadBookings(true), 2, 1000).catch(err => {
-        console.error("All retry attempts failed:", err);
-        // Fallback to sample data
-        const providerId = getProviderId();
-        if (providerId) {
-          loadSampleBookings(providerId);
-        }
-      });
+      loadBookings();
     });
 
     return {
@@ -1759,11 +1648,10 @@ export default {
       showOriginalData,
       showDebug,
       usingSampleData,
+      isDeployed,
       
       // Computed
       selectedPeriodLabel,
-      timelineFilteredBookings,
-      filteredBookings,
       displayBookings,
       paginatedBookings,
       totalPages,
@@ -1781,24 +1669,21 @@ export default {
       selectTimelinePeriod,
       clearTimelinePeriod,
       closeModal,
-      loadSampleBookings,
+      testConnection,
       
       // Utility functions
       getInitials,
       formatDate,
-      formatDateShort,
       formatRelativeTime,
       isNewBooking,
       isUrgentBooking,
       getCustomerName,
       getCustomerEmail,
       getCustomerPhone,
-      getCustomerLocation,
       getServiceName,
       getCategoryName,
       getBookingAmount,
       formatStatus,
-      formatPaymentStatus,
       calculateDuration
     };
   }
