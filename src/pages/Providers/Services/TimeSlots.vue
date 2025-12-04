@@ -89,32 +89,38 @@
               >
                 <!-- COMPACT SINGLE LINE LAYOUT -->
                 <div class="slot-compact-line">
-                  <!-- TIME RANGE -->
+                  <!-- TIME RANGE - MORE SPACE -->
                   <div class="time-range-compact">
                     <i class="fa-solid fa-clock slot-icon"></i>
                     <span v-if="timeSlot.isBooked" class="booked-time-text">
                       {{ formatTime12(timeSlot.startTime) }}–{{ formatTime12(timeSlot.endTime) }}
                     </span>
                     <span v-else class="edit-time-range">
-                      <input
-                        :value="formatTime(timeSlot.startTime)"
-                        @input="updateTimeSlot(timeSlot, 'startTime', $event.target.value)"
-                        type="time"
-                        class="time-input"
-                        @change="validateTimeSlot(timeSlot)"
-                      />
+                      <div class="time-with-period">
+                        <input
+                          :value="formatTime(timeSlot.startTime)"
+                          @input="updateTimeSlot(timeSlot, 'startTime', $event.target.value)"
+                          type="time"
+                          class="time-input"
+                          @change="validateTimeSlot(timeSlot)"
+                        />
+                        <span class="time-period">{{ getTimePeriod(timeSlot.startTime) }}</span>
+                      </div>
                       <span class="time-separator">–</span>
-                      <input
-                        :value="formatTime(timeSlot.endTime)"
-                        @input="updateTimeSlot(timeSlot, 'endTime', $event.target.value)"
-                        type="time"
-                        class="time-input"
-                        @change="validateTimeSlot(timeSlot)"
-                      />
+                      <div class="time-with-period">
+                        <input
+                          :value="formatTime(timeSlot.endTime)"
+                          @input="updateTimeSlot(timeSlot, 'endTime', $event.target.value)"
+                          type="time"
+                          class="time-input"
+                          @change="validateTimeSlot(timeSlot)"
+                        />
+                        <span class="time-period">{{ getTimePeriod(timeSlot.endTime) }}</span>
+                      </div>
                     </span>
                   </div>
 
-                  <!-- STATUS INDICATOR -->
+                  <!-- STATUS INDICATOR - LESS SPACE -->
                   <div class="status-indicator-compact">
                     <!-- BOOKED -->
                     <div v-if="timeSlot.isBooked" class="booked-indicator">
@@ -125,19 +131,19 @@
                       </span>
                     </div>
                     
-                    <!-- AVAILABLE/UNAVAILABLE TOGGLE SWITCH -->
+                    <!-- AVAILABLE/UNAVAILABLE TOGGLE SWITCH - SMALLER -->
                     <div v-else class="toggle-container">
-                      <label class="toggle-switch" :title="timeSlot.isAvailable ? 'Available - Click to make unavailable' : 'Unavailable - Click to make available'">
+                      <label class="toggle-switch-small" :title="timeSlot.isAvailable ? 'Available - Click to make unavailable' : 'Unavailable - Click to make available'">
                         <input
                           type="checkbox"
                           v-model="timeSlot.isAvailable"
                         />
-                        <span class="toggle-slider"></span>
+                        <span class="toggle-slider-small"></span>
                       </label>
                     </div>
                   </div>
 
-                  <!-- ERROR & REMOVE -->
+                  <!-- ERROR & REMOVE - SMALLER -->
                   <div class="actions-compact">
                     <div v-if="timeSlot.hasError" class="error-indicator" :title="timeSlot.errorMessage">
                       <i class="fa-solid fa-exclamation-triangle"></i>
@@ -310,11 +316,25 @@ export default {
       const displayH = h % 12 || 12;
       return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
     },
+    // ✅ GET TIME PERIOD (AM/PM)
+    getTimePeriod(time24) {
+      if (!time24) return 'AM';
+      const [h] = time24.split(':').map(Number);
+      return h >= 12 ? 'PM' : 'AM';
+    },
     // ✅ UPDATE TIME SLOT
     updateTimeSlot(slot, field, newValue) {
       if (newValue && newValue.length === 5) { // HH:mm
         slot[field] = newValue;
       }
+    },
+    // ✅ FORMAT DATE FOR DISPLAY WITH YEAR (e.g., "Dec 4, 2025")
+    formatDateForDisplay(date) {
+      if (typeof date === 'string') date = new Date(date);
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month} ${day}, ${year}`;
     },
     // Rest of your methods unchanged...
     async fetchBookedSlots() {
@@ -550,10 +570,6 @@ export default {
     formatDateForInput(date) {
       if (typeof date === 'string') return date;
       return date.toISOString().split('T')[0];
-    },
-    formatDateForDisplay(date) {
-      if (typeof date === 'string') date = new Date(date);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     },
     formatDateForBackend(dateString) {
       const date = new Date(dateString);
@@ -796,18 +812,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   flex-wrap: nowrap;
 }
 
-/* TIME RANGE COMPACT - ENSURE TIMES ARE ALWAYS VISIBLE */
+/* TIME RANGE COMPACT - MORE SPACE FOR TIMES WITH AM/PM */
 .time-range-compact {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
-  min-width: 160px;
+  min-width: 180px;
 }
 .slot-icon {
   color: #64748b;
@@ -828,27 +844,39 @@ export default {
   color: #1e40af;
   font-size: 0.9rem;
   white-space: nowrap;
-  min-width: 120px;
+  min-width: 140px;
 }
 .edit-time-range {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-wrap: nowrap;
-  min-width: 140px;
+  min-width: 160px;
+}
+.time-with-period {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .time-input {
-  width: 75px;
-  min-width: 75px;
+  width: 70px;
+  min-width: 70px;
   padding: 6px 8px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   text-align: center;
   font-family: 'Inter', monospace;
   color: #1e40af;
   background: white;
   box-sizing: border-box;
+  
+}
+.time-period {
+  font-size: 0.6rem;
+  color: #64748b;
+  font-weight: 600;
+  min-width: 28px;
 }
 .time-input:focus {
   outline: none;
@@ -857,27 +885,29 @@ export default {
 }
 .time-separator {
   color: #64748b;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   flex-shrink: 0;
   padding: 0 2px;
   white-space: nowrap;
+  margin: 0 2px;
 }
 
-/* STATUS INDICATOR COMPACT */
+/* STATUS INDICATOR COMPACT - SMALLER */
 .status-indicator-compact {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  min-width: 50px;
 }
 .booked-indicator {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .status-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -887,32 +917,34 @@ export default {
 .customer-compact {
   background: #fee2e2;
   color: #dc2626;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
-/* SIMPLE TOGGLE SWITCH (NO TEXT - COLOR ONLY) */
+/* SMALLER TOGGLE SWITCH */
 .toggle-container {
   flex-shrink: 0;
+  
 }
-.toggle-switch {
+.toggle-switch-small {
   display: inline-block;
   position: relative;
-  width: 44px;
-  height: 24px;
+  width: 30px;
+  height: 20px;
   cursor: pointer;
+ 
 }
-.toggle-switch input {
+.toggle-switch-small input {
   opacity: 0;
   width: 0;
   height: 0;
 }
-.toggle-slider {
+.toggle-slider-small {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -921,41 +953,42 @@ export default {
   bottom: 0;
   background-color: #ef4444;
   transition: .3s;
-  border-radius: 12px;
+  border-radius: 10px;
 }
-.toggle-slider:before {
+.toggle-slider-small:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
   background-color: white;
   transition: .3s;
   border-radius: 50%;
 }
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch-small input:checked + .toggle-slider-small {
   background-color: #22c55e;
 }
-.toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(20px);
+.toggle-switch-small input:checked + .toggle-slider-small:before {
+  transform: translateX(16px);
 }
 
-/* ACTIONS COMPACT */
+/* ACTIONS COMPACT - SMALLER */
 .actions-compact {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+  min-width: 40px;
 }
 .error-indicator {
   color: #dc2626;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   cursor: help;
 }
 .remove-btn-compact {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #fee2e2;
   color: #dc2626;
@@ -964,7 +997,7 @@ export default {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
   transition: all 0.2s ease;
   padding: 0;
@@ -1054,52 +1087,59 @@ export default {
   cursor: not-allowed;
 }
 
-/* ===== RESPONSIVE DESIGN - FIX MOBILE BREAKING ===== */
+/* ===== RESPONSIVE DESIGN ===== */
 
-/* Desktop (≥768px) - Ensure everything fits */
+/* Desktop (≥768px) */
 @media (min-width: 768px) {
   .slot-compact-line {
-    gap: 12px;
+    gap: 10px;
   }
   .time-range-compact {
-    min-width: 170px;
+    min-width: 190px;
   }
   .time-input {
-    width: 80px;
-    min-width: 80px;
+    width: 70px;
+    min-width: 75px;
+  }
+  .time-period {
+    min-width: 30px;
   }
   .booked-time-text {
-    min-width: 130px;
+    min-width: 150px;
   }
 }
 
-/* Tablet (480px-768px) - Adjust for medium screens */
+/* Tablet (480px-768px) */
 @media (max-width: 768px) and (min-width: 480px) {
   .days-grid {
     grid-template-columns: 1fr;
   }
   .slot-compact-line {
-    gap: 8px;
+    gap: 6px;
   }
   .time-range-compact {
-    min-width: 160px;
+    min-width: 180px;
   }
   .time-input {
-    width: 75px;
-    min-width: 75px;
+    width: 70px;
+    min-width: 70px;
     padding: 5px 6px;
     font-size: 0.85rem;
   }
+  .time-period {
+    font-size: 0.7rem;
+    min-width: 26px;
+  }
   .booked-time-text {
     font-size: 0.85rem;
-    min-width: 120px;
+    min-width: 140px;
   }
 }
 
-/* Mobile (<480px) - PREVENT BREAKING, KEEP TIMES VISIBLE */
+/* Mobile (<480px) */
 @media (max-width: 480px) {
   .time-slots-container {
-    padding: 12px;
+    padding: 15px;
   }
   
   .weekly-schedule-section {
@@ -1115,120 +1155,115 @@ export default {
     padding: 14px;
   }
   
-  /* CRITICAL: PREVENT BREAKING, KEEP SINGLE LINE */
   .slot-compact-line {
-    gap: 6px;
+    gap: 4px;
     align-items: center;
-    min-width: 100%;
   }
   
-  /* ENSURE TIME INPUTS DON'T BREAK */
   .time-range-compact {
-    min-width: 150px;
+    min-width: 170px;
     gap: 4px;
   }
   
   .edit-time-range {
-    min-width: 140px;
+    min-width: 160px;
     gap: 2px;
   }
   
   .time-input {
-    width: 68px;
-    min-width: 68px;
+    width: 80px;
+    min-width: 65px;
     padding: 5px 4px;
     font-size: 0.85rem;
   }
   
-  /* Ensure "12:00" is fully visible */
-  .time-input::-webkit-datetime-edit-hour-field,
-  .time-input::-webkit-datetime-edit-minute-field {
-    padding: 0;
-    margin: 0;
-  }
-  
-  .time-input::-webkit-datetime-edit {
-    padding: 0;
+  .time-period {
+    font-size: 0.7rem;
+    min-width: 24px;
   }
   
   .booked-time-text {
     font-size: 0.85rem;
-    min-width: 110px;
+    min-width: 130px;
   }
   
-  /* Smaller toggle without text */
-  .toggle-switch {
-    width: 40px;
-    height: 22px;
+  .toggle-switch-small {
+    width: 34px;
+    height: 18px;
+   
   }
   
-  .toggle-slider:before {
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
+  .toggle-slider-small:before {
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
   }
   
-  .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(18px);
+  .toggle-switch-small input:checked + .toggle-slider-small:before {
+    transform: translateX(16px);
   }
   
   .customer-compact {
-    width: 22px;
-    height: 22px;
-    font-size: 0.75rem;
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
   }
   
   .actions-compact {
-    gap: 4px;
+    gap: 3px;
   }
   
   .remove-btn-compact {
-    width: 22px;
-    height: 22px;
-    font-size: 0.75rem;
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
   }
 }
 
-/* Extra Small Mobile (<360px) - STILL NO BREAKING */
+/* Extra Small Mobile (<360px) */
 @media (max-width: 360px) {
-  /* FORCE SINGLE LINE - NO BREAKING */
   .slot-compact-line {
-    gap: 4px;
+    gap: 30px;
   }
   
   .time-range-compact {
-    min-width: 140px;
+    min-width: 160px;
   }
   
   .time-input {
-    width: 65px;
-    min-width: 65px;
+    width: 60px;
+    min-width: 60px;
     padding: 4px 3px;
     font-size: 0.8rem;
   }
   
+  .time-period {
+    font-size: 0.65rem;
+    min-width: 22px;
+  }
+  
   .booked-time-text {
     font-size: 0.8rem;
-    min-width: 105px;
+    min-width: 120px;
   }
   
-  .toggle-switch {
-    width: 38px;
-    height: 20px;
+  .toggle-switch-small {
+    width: 32px;
+    height: 16px;
   }
   
-  .toggle-slider:before {
-    height: 14px;
-    width: 14px;
+  .toggle-slider-small:before {
+    height: 12px;
+    width: 12px;
   }
   
-  .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(18px);
+  .toggle-switch-small input:checked + .toggle-slider-small:before {
+    transform: translateX(16px);
   }
 }
 
-/* ENSURE NO BREAKING - CRITICAL RULES */
+/* ENSURE NO BREAKING */
 .slot-compact-line {
   display: flex !important;
   flex-wrap: nowrap !important;
@@ -1242,13 +1277,11 @@ export default {
   overflow: visible !important;
 }
 
-/* Prevent time inputs from being cut off */
 .time-input {
   overflow: visible !important;
   text-overflow: clip !important;
 }
 
-/* For Firefox - ensure time input shows full value */
 .time-input[type="time"] {
   -moz-appearance: textfield;
 }
@@ -1259,8 +1292,8 @@ export default {
   transform: translateY(-1px);
 }
 
-/* Tooltip for toggle to show availability state */
-.toggle-switch[title]:hover::after {
+/* Tooltip for toggle */
+.toggle-switch-small[title]:hover::after {
   content: attr(title);
   position: absolute;
   bottom: 100%;
@@ -1281,8 +1314,8 @@ export default {
   .slot-compact-line,
   .time-slot-item,
   .remove-btn-compact,
-  .toggle-slider,
-  .toggle-slider:before {
+  .toggle-slider-small,
+  .toggle-slider-small:before {
     transition: none;
   }
 }
