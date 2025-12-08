@@ -96,7 +96,7 @@
                       {{ formatTime12(timeSlot.startTime) }}–{{ formatTime12(timeSlot.endTime) }}
                     </span>
                     <span v-else class="edit-time-range">
-                      <div class="time-with-period">
+                      <div class="time-input-wrapper">
                         <input
                           :value="formatTime(timeSlot.startTime)"
                           @input="updateTimeSlot(timeSlot, 'startTime', $event.target.value)"
@@ -104,10 +104,9 @@
                           class="time-input"
                           @change="validateTimeSlot(timeSlot)"
                         />
-                        <span class="time-period">{{ getTimePeriod(timeSlot.startTime) }}</span>
                       </div>
                       <span class="time-separator">–</span>
-                      <div class="time-with-period">
+                      <div class="time-input-wrapper">
                         <input
                           :value="formatTime(timeSlot.endTime)"
                           @input="updateTimeSlot(timeSlot, 'endTime', $event.target.value)"
@@ -115,7 +114,6 @@
                           class="time-input"
                           @change="validateTimeSlot(timeSlot)"
                         />
-                        <span class="time-period">{{ getTimePeriod(timeSlot.endTime) }}</span>
                       </div>
                     </span>
                   </div>
@@ -316,12 +314,6 @@ export default {
       const displayH = h % 12 || 12;
       return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
     },
-    // ✅ GET TIME PERIOD (AM/PM)
-    getTimePeriod(time24) {
-      if (!time24) return 'AM';
-      const [h] = time24.split(':').map(Number);
-      return h >= 12 ? 'PM' : 'AM';
-    },
     // ✅ UPDATE TIME SLOT
     updateTimeSlot(slot, field, newValue) {
       if (newValue && newValue.length === 5) { // HH:mm
@@ -336,7 +328,6 @@ export default {
       const year = date.getFullYear();
       return `${month} ${day}, ${year}`;
     },
-    // Rest of your methods unchanged...
     async fetchBookedSlots() {
       this.loadingBookings = true;
       try {
@@ -659,9 +650,9 @@ export default {
 .time-slots-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
   font-family: "Inter", sans-serif;
-  color: #1e293b;
+  color: #29282e;
 }
 
 /* ===== MESSAGES ===== */
@@ -704,14 +695,14 @@ export default {
   gap: 10px;
 }
 .schedule-header h4 {
-  font-size: 1.25rem;
+  font-size: 2.05rem;
   margin: 0;
   color: #0f172a;
 }
 .date-range {
   background: #dbeafe;
   color: #1d4ed8;
-  padding: 4px 12px;
+  padding: 10px 12px;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -726,17 +717,17 @@ export default {
 .days-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-  gap: 20px;
+  gap: 10px;
 }
 .day-card {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 18px;
-  background: #fff;
+  background: #454365;
 }
-.day-card.working-day { border-color: #22c55e; background: #f0fdf4; }
-.day-card.today { border-color: #3b82f6; background: #eff6ff; }
-.day-card.day-off { opacity: 0.85; background: #f8fafc; }
+.day-card.working-day { border-color: #22c55e; background: #f2f4f6; }
+.day-card.today { border-color: #3b82f6; background: #e0e3b3; }
+.day-card.day-off { opacity: 0.85; background: #fcfdff; }
 .day-header {
   display: flex;
   justify-content: space-between;
@@ -752,13 +743,13 @@ export default {
   cursor: pointer;
 }
 .day-label {
-  font-weight: 600;
+  font-weight: 300;
   font-size: 1.05rem;
 }
 .day-labels { display: flex; gap: 6px; }
 .off-label {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #da182b;
+  color: #111214;
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -784,10 +775,10 @@ export default {
   gap: 8px;
 }
 .time-slot-item {
-  background: white;
+  background: rgb(35, 27, 37);
   border: 1px solid #e2e8f0;
   border-radius: 80px;
-  padding: 8px 10px;
+  padding: 10px 10px;
   transition: all 0.2s ease;
 }
 .time-slot-item.booked-slot {
@@ -796,7 +787,7 @@ export default {
 }
 .time-slot-item.available-slot {
   background: #f0fdf4;
-  border-color: #bbf7d0;
+  border-color: #c1cac4;
 }
 .time-slot-item.unavailable-slot {
   background: #f8fafc;
@@ -817,13 +808,13 @@ export default {
   flex-wrap: nowrap;
 }
 
-/* TIME RANGE COMPACT - MORE SPACE FOR TIMES WITH AM/PM */
+/* TIME RANGE COMPACT - MORE SPACE FOR TIMES */
 .time-range-compact {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
 }
 .slot-icon {
   color: #64748b;
@@ -851,59 +842,53 @@ export default {
   align-items: center;
   gap: 4px;
   flex-wrap: nowrap;
-  min-width: 160px;
+  min-width: 0;
+  flex: 1;
 }
-.time-with-period {
+.time-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 1px;
- 
+  min-width: 0;
 }
 .time-input {
-  width: 70px;
-  min-width: 70px;
+  width: 80px;
+  min-width: 75px;
   padding: 6px 8px;
   border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
   text-align: center;
   font-family: 'Inter', monospace;
-  color: #1e40af;
-  background: white;
+  color: hsl(212, 81%, 34%);
+  background: rgb(247, 250, 253);
   box-sizing: border-box;
-}
-.time-period {
-  font-size: 0.65rem;
-  color: #64748b;
-  font-weight: 600;
-  min-width: 28px;
+  flex-shrink: 0;
 }
 .time-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+  border-color: #966881;
+  box-shadow: 0 0 0 2px rgba(181, 33, 62, 0.2);
 }
 .time-separator {
   color: #64748b;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   flex-shrink: 0;
   padding: 0 2px;
   white-space: nowrap;
   margin: 0 2px;
 }
 
-/* STATUS INDICATOR COMPACT - SMALLER */
+/* STATUS INDICATOR COMPACT */
 .status-indicator-compact {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
-  min-width: 50px;
 }
 .booked-indicator {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .status-dot {
   width: 10px;
@@ -929,7 +914,7 @@ export default {
 /* SMALLER TOGGLE SWITCH */
 .toggle-container {
   flex-shrink: 0;
-  margin-left: 3rem;
+  margin-left: 4px;
 }
 .toggle-switch-small {
   display: inline-block;
@@ -972,18 +957,18 @@ export default {
   transform: translateX(16px);
 }
 
-/* ACTIONS COMPACT - SMALLER */
+/* ACTIONS COMPACT */
 .actions-compact {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   flex-shrink: 0;
-  min-width: 40px;
 }
 .error-indicator {
   color: #dc2626;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   cursor: help;
+  flex-shrink: 0;
 }
 .remove-btn-compact {
   width: 22px;
@@ -996,7 +981,7 @@ export default {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
   transition: all 0.2s ease;
   padding: 0;
@@ -1088,108 +1073,144 @@ export default {
 
 /* ===== RESPONSIVE DESIGN ===== */
 
-/* Desktop (≥768px) */
+/* Desktop (≥768px) - OPTIMIZED FOR DESKTOP */
 @media (min-width: 768px) {
   .slot-compact-line {
-    gap: 10px;
+    gap: 12px;
+    flex-wrap: nowrap;
   }
+  
   .time-range-compact {
-    min-width: 190px;
+    flex: 0 0 220px;
+    min-width: 220px;
   }
+  
   .time-input {
-    width: 70px;
-    min-width: 75px;
+    width: 85px;
+    min-width: 85px;
   }
-  .time-period {
-    min-width: 30px;
-  }
+  
   .booked-time-text {
-    min-width: 150px;
+    min-width: 180px;
+  }
+  
+  .status-indicator-compact {
+    margin-left: 0;
+  }
+  
+  .actions-compact {
+    margin-left: auto;
+  }
+  
+  .remove-btn-compact {
+    margin-left: 8px;
   }
 }
 
-/* Tablet (480px-768px) */
+/* Tablet (480px-768px) - VERTICAL STACK */
 @media (max-width: 768px) and (min-width: 480px) {
   .days-grid {
     grid-template-columns: 1fr;
   }
-  .slot-compact-line {
-    gap: 6px;
-  }
-  .time-range-compact {
-    min-width: 180px;
-  }
-  .time-input {
-    width: 70px;
-    min-width: 70px;
-    padding: 5px 6px;
-    font-size: 0.85rem;
-  }
-  .time-period {
-    font-size: 0.7rem;
-    min-width: 26px;
-  }
-  .booked-time-text {
-    font-size: 0.85rem;
-    min-width: 140px;
-  }
-}
-
-/* Mobile (<480px) */
-@media (max-width: 480px) {
-  .time-slots-container {
-    padding: 15px;
-  }
-  
-  .weekly-schedule-section {
-    padding: 16px;
-  }
-  
-  .days-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  .day-card {
-    padding: 14px;
-  }
   
   .slot-compact-line {
-    gap: 4px;
-    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
   }
   
   .time-range-compact {
-    min-width: 170px;
-    gap: 4px;
-  }
-  
-  .edit-time-range {
-    min-width: 160px;
-    gap: 2px;
+    flex: 0 0 200px;
   }
   
   .time-input {
     width: 80px;
-    min-width: 65px;
+    min-width: 80px;
+    padding: 5px 6px;
+    font-size: 0.85rem;
+  }
+  
+  .booked-time-text {
+    min-width: 160px;
+  }
+  
+  .status-indicator-compact {
+    margin-left: 0;
+  }
+  
+  .actions-compact {
+    margin-left: auto;
+  }
+}
+
+/* Mobile (<480px) - CLEAN VERTICAL STACK */
+@media (max-width: 480px) {
+  .time-slots-container {
+    padding: 10px;
+  }
+  
+  .weekly-schedule-section {
+    padding: 12px;
+  }
+  
+  .days-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .day-card {
+    padding: 12px;
+  }
+  
+  /* MOBILE: VERTICAL STACKING */
+  .slot-compact-line {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  
+  .time-range-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-width: 160px;
+  }
+  
+  .booked-time-text {
+    min-width: 140px;
+    font-size: 0.85rem;
+  }
+  
+  .edit-time-range {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .time-input {
+    width: 75px;
+    min-width: 75px;
     padding: 5px 4px;
     font-size: 0.85rem;
   }
   
-  .time-period {
-    font-size: 0.7rem;
-    min-width: 24px;
+  .status-indicator-compact {
+    flex-shrink: 0;
+    margin-left: 0;
   }
   
-  .booked-time-text {
-    font-size: 0.85rem;
-    min-width: 130px;
+  .actions-compact {
+    flex-shrink: 0;
+    margin-left: 0;
   }
   
   .toggle-switch-small {
-    width: 34px;
+    width: 30px;
     height: 18px;
-   
   }
   
   .toggle-slider-small:before {
@@ -1200,73 +1221,64 @@ export default {
   }
   
   .toggle-switch-small input:checked + .toggle-slider-small:before {
-    transform: translateX(16px);
+    transform: translateX(12px);
   }
   
   .customer-compact {
     width: 20px;
     height: 20px;
-    font-size: 0.7rem;
-  }
-  
-  .actions-compact {
-    gap: 3px;
+    font-size: 0.75rem;
   }
   
   .remove-btn-compact {
     width: 20px;
     height: 20px;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
   }
 }
 
-/* Extra Small Mobile (<360px) */
+/* Extra Small Mobile (<360px) - COMPACT VERTICAL */
 @media (max-width: 360px) {
   .slot-compact-line {
-    gap: 30px;
+    gap: 6px;
   }
   
   .time-range-compact {
-    min-width: 160px;
+    min-width: 140px;
+  }
+  
+  .booked-time-text {
+    min-width: 120px;
+    font-size: 0.8rem;
   }
   
   .time-input {
-    width: 60px;
-    min-width: 60px;
+    width: 65px;
+    min-width: 65px;
     padding: 4px 3px;
     font-size: 0.8rem;
   }
   
-  .time-period {
-    font-size: 0.65rem;
-    min-width: 22px;
-  }
-  
-  .booked-time-text {
-    font-size: 0.8rem;
-    min-width: 120px;
-  }
-  
   .toggle-switch-small {
-    width: 32px;
+    width: 28px;
     height: 16px;
   }
   
   .toggle-slider-small:before {
     height: 12px;
     width: 12px;
+    left: 2px;
+    bottom: 2px;
   }
   
   .toggle-switch-small input:checked + .toggle-slider-small:before {
-    transform: translateX(16px);
+    transform: translateX(12px);
   }
 }
 
 /* ENSURE NO BREAKING */
 .slot-compact-line {
   display: flex !important;
-  flex-wrap: nowrap !important;
-  white-space: nowrap !important;
   overflow: visible !important;
 }
 
@@ -1298,7 +1310,7 @@ export default {
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: #1e293b;
+  background: #2f5082;
   color: white;
   padding: 4px 8px;
   border-radius: 4px;

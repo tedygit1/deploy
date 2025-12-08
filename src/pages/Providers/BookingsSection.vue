@@ -9,10 +9,8 @@
         </div>
         <div class="header-actions">
           <button class="btn btn-primary" @click="loadBookings">
-            <i class="fa-solid fa-rotate"></i> Refresh
-          </button>
-          <button class="btn btn-outline" @click="checkProviderStatus">
-            <i class="fa-solid fa-user-check"></i> Check Status
+            <i class="fa-solid fa-rotate" :class="{ 'fa-spin': loading }"></i>
+            {{ loading ? 'Refreshing...' : 'Refresh' }}
           </button>
         </div>
       </div>
@@ -33,8 +31,35 @@
       </div>
     </div>
 
+    <!-- Error State -->
+    <div v-else-if="error" class="error-container">
+      <div class="error-content">
+        <div class="error-icon">
+          <i class="fa-solid fa-exclamation-triangle"></i>
+        </div>
+        <h3>Unable to Load Bookings</h3>
+        <p>{{ error }}</p>
+        <div class="error-actions">
+          <button class="btn btn-primary" @click="loadBookings">
+            <i class="fa-solid fa-rotate"></i> Try Again
+          </button>
+          <button class="btn btn-outline" @click="showDebugInfo">
+            <i class="fa-solid fa-bug"></i> Debug Info
+          </button>
+        </div>
+        <div v-if="showDebug" class="debug-info">
+          <h4>Debug Information:</h4>
+          <p><strong>Provider ID Found:</strong> {{ debugProviderId || 'None' }}</p>
+          <p><strong>Token Exists:</strong> {{ debugHasToken }}</p>
+          <p><strong>API Endpoint:</strong> {{ debugApiEndpoint }}</p>
+          <p><strong>LocalStorage Keys:</strong> {{ debugLocalStorageKeys }}</p>
+          <button class="btn btn-sm" @click="copyDebugInfo">Copy Debug Info</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Success State - No Bookings -->
-    <div v-else-if="!error && bookings.length === 0" class="success-empty-state">
+    <div v-else-if="bookings.length === 0" class="success-empty-state">
       <div class="success-content">
         <div class="success-icon">
           <i class="fa-regular fa-calendar-check"></i>
@@ -45,58 +70,8 @@
           <button class="btn btn-primary" @click="promoteServices">
             <i class="fa-solid fa-share"></i> Promote Your Services
           </button>
-          <button class="btn btn-outline" @click="viewServices">
-            <i class="fa-solid fa-eye"></i> View Your Services
-          </button>
-        </div>
-        <div class="success-tips">
-          <h4>💡 Tips to Get Your First Booking:</h4>
-          <div class="tips-grid">
-            <div class="tip-card">
-              <i class="fa-solid fa-link"></i>
-              <div>
-                <strong>Share Your Booking Link</strong>
-                <p>Share your unique booking URL on social media and with your network</p>
-              </div>
-            </div>
-            <div class="tip-card">
-              <i class="fa-solid fa-star"></i>
-              <div>
-                <strong>Optimize Your Profile</strong>
-                <p>Add photos, detailed descriptions, and competitive pricing to attract clients</p>
-              </div>
-            </div>
-            <div class="tip-card">
-              <i class="fa-solid fa-bullhorn"></i>
-              <div>
-                <strong>Promote Actively</strong>
-                <p>Tell existing clients about your online booking system</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="error" class="error-container">
-      <div class="error-content">
-        <div class="error-icon">
-          <i class="fa-solid fa-exclamation-triangle"></i>
-        </div>
-        <h3>Unable to Load Bookings</h3>
-        <p>{{ error }}</p>
-        <div class="error-details">
-          <p><strong>Status:</strong> {{ errorStatus }}</p>
-          <p><strong>Provider PID:</strong> {{ currentProviderId }}</p>
-          <p><strong>API Endpoint:</strong> {{ currentEndpoint }}</p>
-        </div>
-        <div class="error-actions">
-          <button class="btn btn-primary" @click="loadBookings">
-            <i class="fa-solid fa-rotate"></i> Try Again
-          </button>
-          <button class="btn btn-outline" @click="checkProviderStatus">
-            <i class="fa-solid fa-user-check"></i> Check Provider Status
+          <button class="btn btn-outline" @click="loadBookings">
+            <i class="fa-solid fa-rotate"></i> Check Again
           </button>
         </div>
       </div>
@@ -116,21 +91,21 @@
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon pending">
-            <i class="fa-solid fa-clock"></i>
+          <div class="stat-icon today">
+            <i class="fa-solid fa-sun"></i>
           </div>
           <div class="stat-content">
-            <h3>{{ stats.pending }}</h3>
-            <p>Pending</p>
+            <h3>{{ stats.today }}</h3>
+            <p>Today</p>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon confirmed">
-            <i class="fa-solid fa-check-circle"></i>
+          <div class="stat-icon upcoming">
+            <i class="fa-solid fa-clock"></i>
           </div>
           <div class="stat-content">
-            <h3>{{ stats.confirmed }}</h3>
-            <p>Confirmed</p>
+            <h3>{{ stats.upcoming }}</h3>
+            <p>Upcoming</p>
           </div>
         </div>
         <div class="stat-card">
@@ -148,49 +123,47 @@
           </div>
           <div class="stat-content">
             <h3>${{ stats.revenue }}</h3>
-            <p>Total Revenue</p>
+            <p>Revenue</p>
           </div>
         </div>
       </div>
 
       <!-- API Status -->
-      <div class="api-status success">
+      <div class="api-status success" v-if="bookings.length > 0">
         <i class="fa-solid fa-circle-check"></i>
-        <span>Connected to Real API • {{ bookings.length }} bookings loaded • Provider: {{ currentProviderId }}</span>
+        <span>Connected • {{ bookings.length }} bookings loaded • Last updated: {{ lastUpdatedTime }}</span>
       </div>
 
-      <!-- Filters and Search -->
+      <!-- Search and Filters -->
       <div class="filters-section">
         <div class="filters-row">
           <div class="search-box">
             <i class="fa-solid fa-search"></i>
             <input 
-              v-model="searchQuery" 
               type="text" 
-              placeholder="Search by customer name, service, or booking ID..."
+              v-model="searchQuery" 
+              placeholder="Search bookings by customer name, service, or email..."
               class="search-input"
             />
           </div>
-          <div class="filter-controls">
-            <select v-model="statusFilter" class="filter-select">
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <button class="btn btn-outline" @click="clearFilters">
-              <i class="fa-solid fa-times"></i> Clear All
-            </button>
-          </div>
+          <select v-model="statusFilter" class="filter-select">
+            <option value="all">All Status</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button class="btn btn-outline" @click="clearFilters">
+            <i class="fa-solid fa-filter-circle-xmark"></i> Clear Filters
+          </button>
         </div>
       </div>
 
-      <!-- Timeline Filter Section (UPDATED & WORKING) -->
+      <!-- Timeline Filter Section -->
       <div class="timeline-filter-section">
         <div class="timeline-filter-header">
-          <h3><i class="fa-solid fa-filter"></i> Filter by Time Period</h3>
-          <p class="timeline-filter-subtitle">Select a time period to view bookings from that timeframe</p>
+          <h3><i class="fa-solid fa-filter"></i> Filter by Service Date</h3>
+          <p class="timeline-filter-subtitle">Select time period based on when the service will happen</p>
         </div>
         
         <div class="timeline-filter-buttons">
@@ -206,45 +179,7 @@
           </button>
         </div>
         
-        <!-- Custom Range Picker (NEW) -->
-        <div v-if="selectedPeriod === 'custom'" class="custom-range-picker">
-          <div class="custom-range-header">
-            <h4><i class="fa-solid fa-calendar-days"></i> Select Custom Date Range</h4>
-          </div>
-          <div class="date-inputs">
-            <div class="date-input-group">
-              <label>Start Date</label>
-              <input 
-                type="date" 
-                v-model="customStartDate" 
-                class="date-input"
-                @change="applyCustomRange"
-              />
-            </div>
-            <div class="date-input-group">
-              <label>End Date</label>
-              <input 
-                type="date" 
-                v-model="customEndDate" 
-                class="date-input"
-                :min="customStartDate"
-                @change="applyCustomRange"
-              />
-            </div>
-            <button 
-              class="btn btn-outline" 
-              @click="clearCustomRange"
-              title="Clear custom range"
-            >
-              <i class="fa-solid fa-times"></i>
-            </button>
-          </div>
-          <div v-if="customDateError" class="custom-range-error">
-            {{ customDateError }}
-          </div>
-        </div>
-        
-        <!-- Active Filter Display (UPDATED) -->
+        <!-- Active Filter Display -->
         <div v-if="selectedPeriod !== 'all'" class="timeline-active-filter">
           <div class="active-filter-row">
             <span class="active-filter-badge">
@@ -254,15 +189,7 @@
                 <i class="fa-solid fa-times"></i>
               </button>
             </span>
-            <span class="filter-count">{{ timelineFilteredBookings.length }} bookings found</span>
-          </div>
-          
-          <!-- Date Range Display for Custom -->
-          <div v-if="selectedPeriod === 'custom' && customStartDate && customEndDate" 
-               class="custom-range-display">
-            <span class="date-range">
-              {{ formatDateDisplay(customStartDate) }} to {{ formatDateDisplay(customEndDate) }}
-            </span>
+            <span class="filter-count">{{ timelineFilteredBookings.length }} bookings</span>
           </div>
         </div>
       </div>
@@ -289,11 +216,143 @@
             >
               <i class="fa-solid fa-grid"></i> Grid
             </button>
+            <button class="btn btn-sm btn-outline" @click="exportBookings">
+              <i class="fa-solid fa-download"></i> Export
+            </button>
+          </div>
+        </div>
+
+        <!-- AMAZING PROFESSIONAL BOOKING CARDS -->
+        <div v-if="viewMode === 'grid'" class="professional-cards-grid">
+          <div 
+            v-for="booking in paginatedBookings" 
+            :key="booking._id"
+            class="professional-card"
+            :class="{
+              'today-card': isTodayBooking(booking),
+              'admin-card': booking.isAdminBooking,
+              'completed-card': booking.status === 'completed'
+            }"
+          >
+            <!-- Card Header with Customer Info -->
+            <div class="card-header-section">
+              <div class="customer-avatar-section">
+                <div class="avatar-circle">
+                  {{ getCleanInitials(booking.customerName) }}
+                </div>
+                <div class="customer-type-indicator" :class="{ 'admin': booking.isAdminBooking }">
+                  {{ booking.isAdminBooking ? 'Admin' : 'Client' }}
+                </div>
+              </div>
+              
+              <div class="customer-info-section">
+                <h4 class="customer-name">{{ formatCustomerName(booking.customerName) }}</h4>
+                <p class="customer-meta">
+                  <span v-if="booking.customerEmail">
+                    <i class="fa-solid fa-envelope"></i> {{ booking.customerEmail }}
+                  </span>
+                  <span v-if="booking.customerPhone">
+                    <i class="fa-solid fa-phone"></i> {{ booking.customerPhone }}
+                  </span>
+                </p>
+              </div>
+              
+              <div class="booking-status-section">
+                <div class="status-badge" :class="booking.status">
+                  {{ formatStatus(booking.status) }}
+                </div>
+                <div class="booking-id">
+                  #{{ booking._id.substring(0, 6) }}
+                </div>
+              </div>
+            </div>
+            
+            <!-- Service Details -->
+            <div class="service-details-section">
+              <div class="service-icon-circle">
+                <i class="fa-solid fa-scissors"></i>
+              </div>
+              <div class="service-info">
+                <h5 class="service-name">{{ formatServiceName(booking.serviceName) }}</h5>
+                <div class="service-meta">
+                  <span class="service-category">{{ booking.serviceCategory }}</span>
+                  <span class="service-duration">{{ calculateDuration(booking.startTime, booking.endTime) }} min</span>
+                </div>
+              </div>
+              <div class="service-amount">
+                <span class="amount-label">Amount</span>
+                <span class="amount-value">${{ getBookingAmount(booking) }}</span>
+              </div>
+            </div>
+            
+            <!-- Date & Time Section -->
+            <div class="datetime-section">
+              <div class="date-time-card">
+                <div class="date-section">
+                  <div class="date-icon">
+                    <i class="fa-solid fa-calendar-days"></i>
+                  </div>
+                  <div class="date-content">
+                    <div class="date-label">Service Date</div>
+                    <div class="date-value">{{ formatCleanDate(booking.bookingDate) }}</div>
+                  </div>
+                </div>
+                
+                <div class="time-section">
+                  <div class="time-icon">
+                    <i class="fa-solid fa-clock"></i>
+                  </div>
+                  <div class="time-content">
+                    <div class="time-label">Time Slot</div>
+                    <div class="time-value">{{ formatTimeSlot(booking.startTime, booking.endTime) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional Info -->
+            <div class="additional-info-section">
+              <div class="info-item">
+                <i class="fa-solid fa-calendar-plus"></i>
+                <span>Booked {{ formatRelativeTime(booking.createdAt) }}</span>
+              </div>
+              <div class="info-item">
+                <i class="fa-solid fa-user-clock"></i>
+                <span>{{ getTimeUntilBooking(booking.bookingDate) }}</span>
+              </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons-section">
+              <button 
+                v-if="booking.status === 'confirmed'"
+                class="action-btn mark-complete-btn"
+                @click="completeBooking(booking)"
+              >
+                <i class="fa-solid fa-check-circle"></i>
+                Mark Complete
+              </button>
+              <button 
+                class="action-btn view-details-btn"
+                @click="viewBookingDetailsModal(booking)"
+              >
+                <i class="fa-solid fa-eye"></i>
+                View Details
+              </button>
+              <button 
+                class="action-btn contact-btn"
+                v-if="!booking.isAdminBooking && booking.customerEmail"
+                @click="contactCustomer(booking)"
+              >
+                <i class="fa-solid fa-message"></i>
+                Contact
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- Bookings List View -->
-        <div v-if="viewMode === 'list'" class="bookings-list">
+        <div v-else class="bookings-list">
           <div class="bookings-table">
             <div class="table-header">
               <div class="table-cell">Customer</div>
@@ -307,75 +366,59 @@
             <div 
               v-for="booking in paginatedBookings" 
               :key="booking._id"
-              :id="'booking-' + booking._id"
               class="table-row"
-              :class="{
-                'highlight-new': isNewBooking(booking),
-                'urgent': isUrgentBooking(booking)
-              }"
             >
-              <!-- Enhanced Customer Cell -->
               <div class="table-cell customer-cell">
-                <div class="customer-avatar" :class="{ 'admin-avatar': booking.isAdminBooking }">
-                  {{ getInitials(getCustomerName(booking)) }}
+                <div class="customer-avatar">
+                  {{ getCleanInitials(booking.customerName) }}
                 </div>
                 <div class="customer-info">
                   <div class="customer-main">
-                    <strong>{{ getCustomerName(booking) }}</strong>
-                    <span v-if="booking.isAdminBooking" class="admin-badge">
-                      <i class="fa-solid fa-user-tie"></i> Admin
+                    <strong>{{ formatCustomerName(booking.customerName) }}</strong>
+                    <span v-if="booking.isAdminBooking" class="type-badge admin">
+                      Admin
+                    </span>
+                    <span v-else class="type-badge client">
+                      Client
                     </span>
                   </div>
-                  <div v-if="!booking.isAdminBooking" class="customer-details">
-                    <span class="customer-email">{{ getCustomerEmail(booking) }}</span>
-                    <span v-if="getCustomerPhone(booking)" class="customer-phone">
-                      <i class="fa-solid fa-phone"></i> {{ getCustomerPhone(booking) }}
-                    </span>
-                  </div>
-                  <div v-else class="customer-details admin-details">
-                    <span class="store-badge">
-                      <i class="fa-solid fa-store"></i> In-store booking
-                    </span>
+                  <div class="customer-details">
+                    <span class="customer-email">{{ booking.customerEmail }}</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Service Cell -->
               <div class="table-cell service-cell">
-                <strong>{{ getServiceName(booking) }}</strong>
-                <span class="service-category">{{ getCategoryName(booking) }}</span>
+                <strong>{{ formatServiceName(booking.serviceName) }}</strong>
+                <span class="service-category">{{ booking.serviceCategory }}</span>
               </div>
 
-              <!-- Enhanced Date & Time Cell -->
               <div class="table-cell datetime-cell">
                 <div class="datetime-container">
                   <div class="date-section">
                     <i class="fa-solid fa-calendar"></i>
-                    <span class="date">{{ formatDate(booking.bookingDate || booking.date) }}</span>
+                    <span class="date">{{ formatCleanDate(booking.bookingDate) }}</span>
                   </div>
                   <div class="time-section">
                     <i class="fa-solid fa-clock"></i>
-                    <span class="time">{{ booking.startTime }} - {{ booking.endTime }}</span>
+                    <span class="time">{{ formatTimeSlot(booking.startTime, booking.endTime) }}</span>
                   </div>
                 </div>
               </div>
               
-              <!-- Duration Cell -->
               <div class="table-cell duration-cell">
                 <div class="duration-container">
                   <i class="fa-solid fa-hourglass-half"></i>
-                  <span>{{ calculateDuration(booking.startTime, booking.endTime) || booking.duration || 60 }} mins</span>
+                  <span>{{ calculateDuration(booking.startTime, booking.endTime) }} mins</span>
                 </div>
               </div>
               
-              <!-- Status Cell -->
               <div class="table-cell status-cell">
                 <span class="status-badge" :class="booking.status">
                   {{ formatStatus(booking.status) }}
                 </span>
               </div>
               
-              <!-- Amount Cell -->
               <div class="table-cell amount-cell">
                 <div class="amount-container">
                   <i class="fa-solid fa-dollar-sign"></i>
@@ -383,24 +426,15 @@
                 </div>
               </div>
               
-              <!-- Actions Cell -->
               <div class="table-cell actions-cell">
                 <div class="action-buttons">
-                  <button 
-                    v-if="booking.status === 'pending'"
-                    class="btn-action confirm"
-                    @click="confirmBooking(booking)"
-                    title="Confirm Booking"
-                  >
-                    <i class="fa-solid fa-check"></i>
-                  </button>
                   <button 
                     v-if="booking.status === 'confirmed'"
                     class="btn-action complete"
                     @click="completeBooking(booking)"
                     title="Mark Complete"
                   >
-                    <i class="fa-solid fa-flag-checkered"></i>
+                    <i class="fa-solid fa-check-circle"></i>
                   </button>
                   <button 
                     class="btn-action view"
@@ -409,160 +443,16 @@
                   >
                     <i class="fa-solid fa-eye"></i>
                   </button>
+                  <button 
+                    class="btn-action contact"
+                    v-if="!booking.isAdminBooking && booking.customerEmail"
+                    @click="contactCustomer(booking)"
+                    title="Contact Customer"
+                  >
+                    <i class="fa-solid fa-message"></i>
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- AMAZING Bookings Grid View -->
-        <div v-else class="bookings-grid">
-          <div 
-            v-for="booking in paginatedBookings" 
-            :key="booking._id"
-            :id="'booking-' + booking._id"
-            class="booking-card"
-            :class="{
-              'new-booking': isNewBooking(booking),
-              'urgent-booking': isUrgentBooking(booking),
-              'admin-booking': booking.isAdminBooking
-            }"
-          >
-            <!-- Card Header -->
-            <div class="card-header">
-              <div class="customer-avatar large" :class="{ 'admin-avatar': booking.isAdminBooking }">
-                {{ getInitials(getCustomerName(booking)) }}
-              </div>
-              <div class="customer-info">
-                <div class="customer-main">
-                  <h4>{{ getCustomerName(booking) }}</h4>
-                  <div class="customer-badges">
-                    <span v-if="booking.isAdminBooking" class="admin-badge">
-                      <i class="fa-solid fa-user-tie"></i> Admin
-                    </span>
-                    <span class="status-badge" :class="booking.status">
-                      {{ formatStatus(booking.status) }}
-                    </span>
-                  </div>
-                </div>
-                <div v-if="!booking.isAdminBooking" class="customer-contact">
-                  <span class="contact-item">
-                    <i class="fa-solid fa-envelope"></i>
-                    {{ getCustomerEmail(booking) }}
-                  </span>
-                  <span v-if="getCustomerPhone(booking)" class="contact-item">
-                    <i class="fa-solid fa-phone"></i>
-                    {{ getCustomerPhone(booking) }}
-                  </span>
-                </div>
-                <div v-else class="customer-contact admin-contact">
-                  <span class="store-badge">
-                    <i class="fa-solid fa-store"></i> In-store booking
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Service Details -->
-            <div class="service-section">
-              <div class="service-icon">
-                <i class="fa-solid fa-scissors"></i>
-              </div>
-              <div class="service-details">
-                <h5>{{ getServiceName(booking) }}</h5>
-                <p class="service-category">{{ getCategoryName(booking) }}</p>
-              </div>
-            </div>
-            
-            <!-- BEAUTIFUL Booking Details Grid -->
-            <div class="booking-details-grid">
-              <div class="details-header">
-                <i class="fa-solid fa-calendar-days"></i>
-                <span>Booking Details</span>
-              </div>
-              
-              <div class="details-container">
-                <!-- Date & Time Row -->
-                <div class="detail-row combined">
-                  <div class="detail-item">
-                    <div class="detail-icon">
-                      <i class="fa-solid fa-calendar"></i>
-                    </div>
-                    <div class="detail-content">
-                      <span class="detail-label">DATE</span>
-                      <span class="detail-value">{{ formatDate(booking.bookingDate || booking.date) }}</span>
-                    </div>
-                  </div>
-                  <div class="detail-item">
-                    <div class="detail-icon">
-                      <i class="fa-solid fa-clock"></i>
-                    </div>
-                    <div class="detail-content">
-                      <span class="detail-label">TIME</span>
-                      <span class="detail-value">{{ booking.startTime }} - {{ booking.endTime }}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Duration & Amount Row -->
-                <div class="detail-row combined">
-                  <div class="detail-item">
-                    <div class="detail-icon">
-                      <i class="fa-solid fa-hourglass-half"></i>
-                    </div>
-                    <div class="detail-content">
-                      <span class="detail-label">DURATION</span>
-                      <span class="detail-value">{{ calculateDuration(booking.startTime, booking.endTime) || booking.duration || 60 }} mins</span>
-                    </div>
-                  </div>
-                  <div class="detail-item">
-                    <div class="detail-icon">
-                      <i class="fa-solid fa-dollar-sign"></i>
-                    </div>
-                    <div class="detail-content">
-                      <span class="detail-label">AMOUNT</span>
-                      <span class="detail-value amount">${{ getBookingAmount(booking) }}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Timestamp Row (Full Width) -->
-                <div class="detail-row full-width">
-                  <div class="detail-item timestamp-item">
-                    <div class="detail-icon">
-                      <i class="fa-solid fa-clock-rotate-left"></i>
-                    </div>
-                    <div class="detail-content">
-                      <span class="detail-label">BOOKED</span>
-                      <span class="detail-value">{{ formatRelativeTime(booking.createdAt) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="card-actions">
-              <button 
-                v-if="booking.status === 'pending'"
-                class="action-btn confirm-btn"
-                @click="confirmBooking(booking)"
-              >
-                <i class="fa-solid fa-check"></i> Confirm
-              </button>
-              <button 
-                v-if="booking.status === 'confirmed'"
-                class="action-btn complete-btn"
-                @click="completeBooking(booking)"
-              >
-                <i class="fa-solid fa-flag-checkered"></i> Complete
-              </button>
-              <button 
-                class="action-btn view-btn"
-                @click="viewBookingDetailsModal(booking)"
-              >
-                <i class="fa-solid fa-eye"></i> View Details
-              </button>
             </div>
           </div>
         </div>
@@ -597,206 +487,63 @@
             Next <i class="fa-solid fa-chevron-right"></i>
           </button>
         </div>
+
+        <!-- No Results Message -->
+        <div v-if="displayBookings.length === 0 && bookings.length > 0" class="no-results">
+          <i class="fa-solid fa-search"></i>
+          <h4>No bookings match your filters</h4>
+          <p>Try changing your search query or filters</p>
+          <button class="btn btn-outline" @click="clearFilters">
+            <i class="fa-solid fa-filter-circle-xmark"></i> Clear All Filters
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Booking Details Modal -->
-    <div v-if="selectedBooking" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
+    <div v-if="selectedBooking" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
         <div class="modal-header">
-          <h3>
-            <i class="fa-solid fa-circle-info"></i>
-            Booking Details
-          </h3>
+          <h3>Booking Details</h3>
           <button class="modal-close" @click="closeModal">
             <i class="fa-solid fa-times"></i>
           </button>
         </div>
-        
         <div class="modal-body">
-          <!-- Booking Overview -->
-          <div class="booking-overview">
-            <div class="overview-avatar" :class="{ 'admin-avatar': selectedBooking.isAdminBooking }">
-              {{ getInitials(getCustomerName(selectedBooking)) }}
-            </div>
-            <div class="overview-info">
-              <h4>{{ getCustomerName(selectedBooking) }}</h4>
-              <div class="overview-badges">
-                <span class="status-badge" :class="selectedBooking.status">
-                  {{ formatStatus(selectedBooking.status) }}
-                </span>
-                <span v-if="selectedBooking.isAdminBooking" class="admin-badge">
-                  <i class="fa-solid fa-user-tie"></i> Admin Booking
-                </span>
-              </div>
-              <div class="overview-meta">
-                <span>Booked {{ formatRelativeTime(selectedBooking.createdAt) }}</span>
-                <span>•</span>
-                <span>Booking ID: {{ selectedBooking._id?.substring(0, 8) }}...</span>
-              </div>
-            </div>
-            <div class="overview-amount">
-              <span class="amount-label">Total Amount</span>
-              <span class="amount-value">${{ getBookingAmount(selectedBooking) }}</span>
-            </div>
-          </div>
-
-          <!-- Service Details -->
-          <div class="details-section">
-            <h5><i class="fa-solid fa-scissors"></i> Service Details</h5>
-            <div class="details-grid">
-              <div class="detail-item">
-                <span class="detail-label">Service</span>
-                <span class="detail-value">{{ getServiceName(selectedBooking) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Category</span>
-                <span class="detail-value">{{ getCategoryName(selectedBooking) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Date</span>
-                <span class="detail-value">{{ formatDate(selectedBooking.bookingDate || selectedBooking.date) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Time</span>
-                <span class="detail-value">{{ selectedBooking.startTime }} - {{ selectedBooking.endTime }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Duration</span>
-                <span class="detail-value">{{ calculateDuration(selectedBooking.startTime, selectedBooking.endTime) || selectedBooking.duration || 60 }} minutes</span>
-              </div>
+          <div v-if="selectedBooking" class="booking-details">
+            <h4>Customer Information</h4>
+            <p><strong>Name:</strong> {{ selectedBooking.customerName }}</p>
+            <p><strong>Email:</strong> {{ selectedBooking.customerEmail || 'Not provided' }}</p>
+            <p><strong>Phone:</strong> {{ selectedBooking.customerPhone || 'Not provided' }}</p>
+            
+            <h4>Service Details</h4>
+            <p><strong>Service:</strong> {{ selectedBooking.serviceName }}</p>
+            <p><strong>Category:</strong> {{ selectedBooking.serviceCategory }}</p>
+            <p><strong>Amount:</strong> ${{ selectedBooking.amount }}</p>
+            
+            <h4>Timing</h4>
+            <p><strong>Date:</strong> {{ formatCleanDate(selectedBooking.bookingDate) }}</p>
+            <p><strong>Time:</strong> {{ selectedBooking.startTime }} - {{ selectedBooking.endTime }}</p>
+            <p><strong>Duration:</strong> {{ calculateDuration(selectedBooking.startTime, selectedBooking.endTime) }} minutes</p>
+            
+            <h4>Status</h4>
+            <p><strong>Current Status:</strong> {{ formatStatus(selectedBooking.status) }}</p>
+            <p><strong>Booked:</strong> {{ formatRelativeTime(selectedBooking.createdAt) }}</p>
+            
+            <div class="modal-actions">
+              <button class="btn btn-primary" @click="closeModal">
+                <i class="fa-solid fa-check"></i> Close
+              </button>
             </div>
           </div>
-
-          <!-- Booker Details (Enhanced) -->
-          <div class="details-section">
-            <h5><i class="fa-solid fa-user-circle"></i> Booker Details</h5>
-            <div class="details-grid">
-              <!-- Admin Booker Details -->
-              <template v-if="selectedBooking.isAdminBooking">
-                <div class="detail-item">
-                  <span class="detail-label">Booker Type</span>
-                  <span class="detail-value admin-value">
-                    <i class="fa-solid fa-user-tie"></i> Admin User
-                  </span>
-                </div>
-                <div v-if="selectedBooking.originalData?.adminName" class="detail-item">
-                  <span class="detail-label">Admin Name</span>
-                  <span class="detail-value">{{ selectedBooking.originalData.adminName }}</span>
-                </div>
-                <div v-if="selectedBooking.originalData?.adminEmail" class="detail-item">
-                  <span class="detail-label">Admin Email</span>
-                  <span class="detail-value">{{ selectedBooking.originalData.adminEmail }}</span>
-                </div>
-                <div v-if="selectedBooking.originalData?.adminPhone" class="detail-item">
-                  <span class="detail-label">Admin Phone</span>
-                  <span class="detail-value">{{ selectedBooking.originalData.adminPhone }}</span>
-                </div>
-                <div v-if="selectedBooking.originalData?.adminId" class="detail-item">
-                  <span class="detail-label">Admin ID</span>
-                  <span class="detail-value code">{{ selectedBooking.originalData.adminId }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Booking Method</span>
-                  <span class="detail-value">In-store / Admin Panel</span>
-                </div>
-              </template>
-              
-              <!-- Customer Booker Details -->
-              <template v-else>
-                <div class="detail-item">
-                  <span class="detail-label">Customer Name</span>
-                  <span class="detail-value">{{ getCustomerName(selectedBooking) }}</span>
-                </div>
-                <div v-if="getCustomerEmail(selectedBooking)" class="detail-item">
-                  <span class="detail-label">Email</span>
-                  <span class="detail-value">{{ getCustomerEmail(selectedBooking) }}</span>
-                </div>
-                <div v-if="getCustomerPhone(selectedBooking)" class="detail-item">
-                  <span class="detail-label">Phone</span>
-                  <span class="detail-value">{{ getCustomerPhone(selectedBooking) }}</span>
-                </div>
-                <div v-if="selectedBooking.customerLocation" class="detail-item">
-                  <span class="detail-label">Location</span>
-                  <span class="detail-value">{{ selectedBooking.customerLocation }}</span>
-                </div>
-                <div v-if="selectedBooking.originalData?.customer?._id" class="detail-item">
-                  <span class="detail-label">Customer ID</span>
-                  <span class="detail-value code">{{ selectedBooking.originalData.customer._id }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Booking Method</span>
-                  <span class="detail-value">Online Booking</span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- Payment Details -->
-          <div v-if="selectedBooking.originalData?.paymentStatus" class="details-section">
-            <h5><i class="fa-solid fa-credit-card"></i> Payment Details</h5>
-            <div class="details-grid">
-              <div class="detail-item">
-                <span class="detail-label">Payment Status</span>
-                <span class="detail-value payment-status" :class="selectedBooking.originalData.paymentStatus">
-                  {{ formatPaymentStatus(selectedBooking.originalData.paymentStatus) }}
-                </span>
-              </div>
-              <div v-if="selectedBooking.originalData?.paymentMethod" class="detail-item">
-                <span class="detail-label">Payment Method</span>
-                <span class="detail-value">{{ selectedBooking.originalData.paymentMethod }}</span>
-              </div>
-              <div v-if="selectedBooking.originalData?.paymentAmount" class="detail-item">
-                <span class="detail-label">Amount Paid</span>
-                <span class="detail-value">${{ parseFloat(selectedBooking.originalData.paymentAmount).toFixed(2) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Additional Information -->
-          <div class="details-section" v-if="selectedBooking.notes || selectedBooking.originalData?.specialRequirements">
-            <h5><i class="fa-solid fa-note-sticky"></i> Additional Information</h5>
-            <div class="notes-content">
-              {{ selectedBooking.notes || selectedBooking.originalData?.specialRequirements || 'No additional notes' }}
-            </div>
-          </div>
-
-          <!-- Original Data (Debug/Admin View) -->
-          <div v-if="showOriginalData" class="details-section debug-section">
-            <h5 @click="showOriginalData = !showOriginalData" style="cursor: pointer;">
-              <i class="fa-solid fa-code"></i>
-              Original API Data (Click to toggle)
-            </h5>
-            <pre v-if="showOriginalData">{{ JSON.stringify(selectedBooking.originalData, null, 2) }}</pre>
-          </div>
-        </div>
-        
-        <div class="modal-footer">
-          <button class="btn btn-outline" @click="closeModal">
-            <i class="fa-solid fa-times"></i> Close
-          </button>
-          <button 
-            v-if="selectedBooking.status === 'pending'"
-            class="btn btn-primary"
-            @click="confirmBooking(selectedBooking); closeModal();"
-          >
-            <i class="fa-solid fa-check"></i> Confirm Booking
-          </button>
-          <button 
-            v-if="selectedBooking.status === 'confirmed'"
-            class="btn btn-success"
-            @click="completeBooking(selectedBooking); closeModal();"
-          >
-            <i class="fa-solid fa-flag-checkered"></i> Mark as Complete
-          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-  
+
 <script>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
 import http from "@/api/index.js";
 
 export default {
@@ -807,101 +554,313 @@ export default {
     const loading = ref(true);
     const loadingProgress = ref(0);
     const error = ref("");
-    const errorStatus = ref("");
     const bookings = ref([]);
     const searchQuery = ref("");
     const statusFilter = ref("all");
-    const viewMode = ref("list");
-    const selectedPeriod = ref("all");
+    const viewMode = ref("grid");
+    const selectedPeriod = ref("today");
     const currentPage = ref(1);
-    const itemsPerPage = ref(10);
+    const itemsPerPage = ref(12);
     const selectedBooking = ref(null);
-    const currentProviderId = ref("");
-    const currentEndpoint = ref("");
-    const showOriginalData = ref(false);
     const showDebug = ref(false);
-    const usingSampleData = ref(false);
-    const isDeployed = ref(window.location.hostname.includes('vercel.app'));
+    const lastUpdatedTime = ref("");
     
-    // NEW: Custom date range
-    const customStartDate = ref("");
-    const customEndDate = ref("");
-    const customDateError = ref("");
-
-    // Timeline periods - UPDATED with "All Bookings" option
+    // Debug info
+    const debugProviderId = ref("");
+    const debugHasToken = ref(false);
+    const debugApiEndpoint = ref("");
+    const debugLocalStorageKeys = ref("");
+    
+    // Timeline periods
     const timelinePeriods = ref([
-      { id: "all", label: "All Bookings", icon: "fa-solid fa-calendar" },
+      { id: "all", label: "All Future", icon: "fa-solid fa-calendar" },
+      { id: "past", label: "Past", icon: "fa-solid fa-calendar-minus" },
       { id: "today", label: "Today", icon: "fa-solid fa-calendar-day" },
-      { id: "yesterday", label: "Yesterday", icon: "fa-solid fa-calendar-minus" },
-      { id: "week", label: "This Week", icon: "fa-solid fa-calendar-week" },
-      { id: "month", label: "This Month", icon: "fa-solid fa-calendar" },
-      { id: "custom", label: "Custom Range", icon: "fa-solid fa-sliders" }
+      { id: "tomorrow", label: "Tomorrow", icon: "fa-solid fa-calendar-plus" },
+      { id: "next5days", label: "Next 5 Days", icon: "fa-solid fa-calendar-week" }
     ]);
 
     // Statistics
     const stats = ref({
       totalBookings: 0,
-      pending: 0,
-      confirmed: 0,
+      today: 0,
+      upcoming: 0,
       completed: 0,
-      cancelled: 0,
       revenue: 0
     });
 
-    // Known provider PIDs
-    const knownProviderPids = {
-      "691e1659e304653542a825d5": "PROV-1763579481598-1GBEN",
-      "692b3c78d399bc41c3712380": "PROV-1764441208540-C269P"
+    // ==================== IMPROVED: Get Provider ID ====================
+    const getProviderId = () => {
+      console.log("🔍 Getting provider ID for bookings...");
+      
+      // Check multiple possible locations for provider ID
+      const possibleSources = [
+        // 1. Direct from localStorage
+        () => {
+          const providerId = localStorage.getItem('providerId');
+          console.log("🔍 Checking localStorage.providerId:", providerId);
+          return providerId;
+        },
+        
+        // 2. From loggedProvider in localStorage
+        () => {
+          const loggedProvider = localStorage.getItem('loggedProvider');
+          if (loggedProvider) {
+            try {
+              const parsed = JSON.parse(loggedProvider);
+              console.log("🔍 Checking loggedProvider:", parsed);
+              return parsed.pid || parsed.providerId || parsed._id || parsed.id;
+            } catch (e) {
+              console.warn("❌ Failed to parse loggedProvider:", e);
+            }
+          }
+          return null;
+        },
+        
+        // 3. From providerProfile in localStorage
+        () => {
+          const providerProfile = localStorage.getItem('providerProfile');
+          if (providerProfile) {
+            try {
+              const parsed = JSON.parse(providerProfile);
+              console.log("🔍 Checking providerProfile:", parsed);
+              return parsed.pid || parsed._id || parsed.id;
+            } catch (e) {
+              console.warn("❌ Failed to parse providerProfile:", e);
+            }
+          }
+          return null;
+        },
+        
+        // 4. Check for token to verify authentication
+        () => {
+          const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+          if (token) {
+            console.log("✅ Token exists, trying to fetch user profile...");
+            debugHasToken.value = true;
+            return null; // Will fetch from API
+          }
+          return null;
+        }
+      ];
+      
+      // Try each source in order
+      for (const source of possibleSources) {
+        const providerId = source();
+        if (providerId) {
+          console.log("✅ Found provider ID:", providerId);
+          debugProviderId.value = providerId;
+          return providerId;
+        }
+      }
+      
+      console.warn("❌ No provider ID found locally");
+      return null;
     };
 
-    // ==================== COMPUTED PROPERTIES ====================
-
-    const timelineFilteredBookings = computed(() => {
-      if (selectedPeriod.value === "all" || !selectedPeriod.value) {
-        return bookings.value;
+    // ==================== IMPROVED: Load Bookings Function ====================
+    const loadBookings = async () => {
+      console.log("🚀 Starting bookings load...");
+      
+      loading.value = true;
+      loadingProgress.value = 0;
+      error.value = "";
+      debugProviderId.value = "";
+      debugHasToken.value = false;
+      debugApiEndpoint.value = "";
+      
+      try {
+        // Get provider ID
+        let providerId = getProviderId();
+        debugProviderId.value = providerId || "Not found";
+        
+        // If no provider ID found, try to get it from API
+        if (!providerId) {
+          console.log("🔄 No provider ID found locally, trying to fetch from API...");
+          try {
+            const userResponse = await http.get('/users/profile');
+            const userData = userResponse.data;
+            console.log("👤 User profile data:", userData);
+            
+            // Extract provider ID from user data
+            providerId = userData.providerId || userData.pid || userData._id || userData.id;
+            
+            if (providerId) {
+              console.log("✅ Got provider ID from API:", providerId);
+              debugProviderId.value = providerId;
+              // Save it for future use
+              localStorage.setItem('providerId', providerId);
+            } else {
+              throw new Error("No provider ID in user profile");
+            }
+          } catch (apiErr) {
+            console.error("❌ Failed to fetch user profile:", apiErr);
+            error.value = "Unable to authenticate. Please login again.";
+            loading.value = false;
+            return;
+          }
+        }
+        
+        // Update progress
+        loadingProgress.value = 30;
+        
+        // Try multiple API endpoints
+        const bookingEndpoints = [
+          `/infinity-booking/bookings/provider/${providerId}`,
+          `/bookings/provider/${providerId}`,
+          `/bookings?providerId=${providerId}`,
+          `/infinity-booking/bookings/stats/provider/${providerId}`
+        ];
+        
+        let bookingsData = null;
+        let successfulEndpoint = "";
+        
+        for (const endpoint of bookingEndpoints) {
+          try {
+            console.log(`📡 Trying endpoint: ${endpoint}`);
+            debugApiEndpoint.value = endpoint;
+            const response = await http.get(endpoint);
+            console.log("📦 API Response:", response);
+            
+            if (response.data && (Array.isArray(response.data) || response.data.bookings || response.data.data)) {
+              bookingsData = response.data;
+              successfulEndpoint = endpoint;
+              break;
+            }
+          } catch (endpointError) {
+            console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+          }
+        }
+        
+        loadingProgress.value = 70;
+        
+        if (!bookingsData) {
+          throw new Error("No bookings data found from any endpoint");
+        }
+        
+        console.log(`✅ Successfully loaded from: ${successfulEndpoint}`);
+        
+        // Process the bookings data
+        bookings.value = processBookings(bookingsData);
+        calculateStats();
+        
+        loadingProgress.value = 100;
+        lastUpdatedTime.value = new Date().toLocaleTimeString();
+        
+        console.log(`✅ Loaded ${bookings.value.length} bookings`);
+        
+      } catch (err) {
+        console.error("❌ Load Error:", err);
+        error.value = err.response?.data?.message || err.message || "Failed to load bookings";
+        
+        // Store debug info
+        debugLocalStorageKeys.value = Array.from({length: localStorage.length}, (_, i) => 
+          localStorage.key(i)
+        ).join(", ");
+        
+        bookings.value = [];
+        calculateStats();
+      } finally {
+        loading.value = false;
+        setTimeout(() => { loadingProgress.value = 0; }, 500);
       }
+    };
 
+    // ==================== DATE HELPER FUNCTIONS ====================
+    const getTodayStart = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      return today;
+    };
+
+    const getTomorrowStart = () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow;
+    };
+
+    const getDayAfterTomorrowStart = () => {
+      const dayAfterTomorrow = new Date();
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      dayAfterTomorrow.setHours(0, 0, 0, 0);
+      return dayAfterTomorrow;
+    };
+
+    const getNext6DaysEnd = () => {
+      const next6Days = new Date();
+      next6Days.setDate(next6Days.getDate() + 7);
+      next6Days.setHours(23, 59, 59, 999);
+      return next6Days;
+    };
+
+    const isPastBooking = (booking) => {
+      if (!booking || !booking.bookingDate) return false;
+      try {
+        const bookingDate = new Date(booking.bookingDate);
+        const todayStart = getTodayStart();
+        return bookingDate < todayStart;
+      } catch (err) {
+        console.error("Error checking past booking:", err);
+        return false;
+      }
+    };
+
+    const isTodayBooking = (booking) => {
+      if (!booking || !booking.bookingDate) return false;
+      try {
+        const bookingDate = new Date(booking.bookingDate);
+        const todayStart = getTodayStart();
+        const tomorrowStart = getTomorrowStart();
+        return bookingDate >= todayStart && bookingDate < tomorrowStart;
+      } catch (err) {
+        console.error("Error checking today booking:", err);
+        return false;
+      }
+    };
+
+    const isTomorrowBooking = (booking) => {
+      if (!booking || !booking.bookingDate) return false;
+      try {
+        const bookingDate = new Date(booking.bookingDate);
+        const tomorrowStart = getTomorrowStart();
+        const dayAfterTomorrowStart = getDayAfterTomorrowStart();
+        return bookingDate >= tomorrowStart && bookingDate < dayAfterTomorrowStart;
+      } catch (err) {
+        console.error("Error checking tomorrow booking:", err);
+        return false;
+      }
+    };
+
+    const isNext5DaysBooking = (booking) => {
+      if (!booking || !booking.bookingDate) return false;
+      try {
+        const bookingDate = new Date(booking.bookingDate);
+        const dayAfterTomorrowStart = getDayAfterTomorrowStart();
+        const next6DaysEnd = getNext6DaysEnd();
+        return bookingDate >= dayAfterTomorrowStart && bookingDate <= next6DaysEnd;
+      } catch (err) {
+        console.error("Error checking next 5 days booking:", err);
+        return false;
+      }
+    };
+
+    // ==================== FILTERING ====================
+    const timelineFilteredBookings = computed(() => {
+      if (selectedPeriod.value === "all") {
+        return bookings.value.filter(booking => !isPastBooking(booking));
+      }
 
       return bookings.value.filter(booking => {
-        if (!booking.bookingDate) return false;
-        
-        const bookingDate = new Date(booking.bookingDate);
-        bookingDate.setHours(0, 0, 0, 0);
-
         switch (selectedPeriod.value) {
+          case "past":
+            return isPastBooking(booking);
           case "today":
-            return bookingDate.getTime() === today.getTime();
-            
-          case "yesterday":
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            return bookingDate.getTime() === yesterday.getTime();
-            
-          case "week":
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // End of week (Saturday)
-            return bookingDate >= startOfWeek && bookingDate <= endOfWeek;
-            
-          case "month":
-            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
-            
-          case "custom":
-            if (!customStartDate.value || !customEndDate.value) return true;
-            
-            const start = new Date(customStartDate.value);
-            start.setHours(0, 0, 0, 0);
-            
-            const end = new Date(customEndDate.value);
-            end.setHours(23, 59, 59, 999);
-            
-            return bookingDate >= start && bookingDate <= end;
-            
+            return isTodayBooking(booking);
+          case "tomorrow":
+            return isTomorrowBooking(booking);
+          case "next5days":
+            return isNext5DaysBooking(booking);
           default:
             return true;
         }
@@ -911,18 +870,16 @@ export default {
     const filteredBookings = computed(() => {
       let filtered = timelineFilteredBookings.value;
 
-      // Search filter
       if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
         filtered = filtered.filter(booking => 
-          getCustomerName(booking).toLowerCase().includes(query) ||
-          getServiceName(booking).toLowerCase().includes(query) ||
-          getCustomerEmail(booking).toLowerCase().includes(query) ||
-          (booking._id && booking._id.toLowerCase().includes(query))
+          booking.customerName.toLowerCase().includes(query) ||
+          booking.serviceName.toLowerCase().includes(query) ||
+          booking.customerEmail.toLowerCase().includes(query) ||
+          booking.serviceCategory.toLowerCase().includes(query)
         );
       }
 
-      // Status filter
       if (statusFilter.value !== 'all') {
         filtered = filtered.filter(booking => booking.status === statusFilter.value);
       }
@@ -931,256 +888,20 @@ export default {
     });
 
     const displayBookings = computed(() => filteredBookings.value);
-
     const paginatedBookings = computed(() => {
       const start = (currentPage.value - 1) * itemsPerPage.value;
       const end = start + itemsPerPage.value;
       return displayBookings.value.slice(start, end);
     });
-
-    const totalPages = computed(() => 
-      Math.ceil(displayBookings.value.length / itemsPerPage.value)
-    );
-
-    // ==================== TIMELINE FILTER FUNCTIONS ====================
-
-    const selectTimelinePeriod = (periodId) => {
-      selectedPeriod.value = periodId;
-      currentPage.value = 1;
-      
-      // Set default dates for custom range
-      if (periodId === 'custom' && !customStartDate.value) {
-        const today = new Date();
-        const oneWeekAgo = new Date(today);
-        oneWeekAgo.setDate(today.getDate() - 7);
-        
-        customStartDate.value = formatDateForInput(oneWeekAgo);
-        customEndDate.value = formatDateForInput(today);
-        applyCustomRange();
-      }
-    };
-
-    const clearTimelinePeriod = () => {
-      selectedPeriod.value = "all";
-      customStartDate.value = "";
-      customEndDate.value = "";
-      customDateError.value = "";
-      currentPage.value = 1;
-    };
-
-    const clearCustomRange = () => {
-      customStartDate.value = "";
-      customEndDate.value = "";
-      customDateError.value = "";
-      
-      // If custom period is selected, switch to all
-      if (selectedPeriod.value === 'custom') {
-        selectedPeriod.value = 'all';
-      }
-    };
-
-    const applyCustomRange = () => {
-      if (!customStartDate.value || !customEndDate.value) {
-        customDateError.value = "Please select both start and end dates";
-        return;
-      }
-      
-      const start = new Date(customStartDate.value);
-      const end = new Date(customEndDate.value);
-      
-      if (start > end) {
-        customDateError.value = "Start date cannot be after end date";
-        return;
-      }
-      
-      customDateError.value = "";
-      selectedPeriod.value = 'custom';
-      currentPage.value = 1;
-    };
-
-    const getActiveFilterLabel = () => {
-      if (selectedPeriod.value === "all") return "All";
-      
-      const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
-      if (period) {
-        if (period.id === 'custom' && customStartDate.value && customEndDate.value) {
-          return `Custom: ${formatDateDisplay(customStartDate.value)} - ${formatDateDisplay(customEndDate.value)}`;
-        }
-        return period.label;
-      }
-      
-      return "";
-    };
-
-    const formatDateForInput = (date) => {
-      const d = new Date(date);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const formatDateDisplay = (dateString) => {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    };
-
-    // Watch for custom date changes
-    watch([customStartDate, customEndDate], () => {
-      if (customStartDate.value && customEndDate.value) {
-        applyCustomRange();
-      }
-    });
-
-    // ==================== CORS-FRIENDLY LOADING ====================
-
-    const getProviderId = () => {
-      try {
-        const loggedProvider = localStorage.getItem("loggedProvider");
-        
-        if (!loggedProvider) {
-          throw new Error("No logged provider found. Please login again.");
-        }
-        
-        const providerData = JSON.parse(loggedProvider);
-        
-        // Check if PID exists in localStorage
-        const existingPid = providerData.pid || providerData.providerProfile?.pid;
-        if (existingPid) {
-          currentProviderId.value = existingPid;
-          return existingPid;
-        }
-        
-        // Use manual mapping
-        const mappedPid = knownProviderPids[providerData._id];
-        if (mappedPid) {
-          const updatedData = { ...providerData, pid: mappedPid };
-          localStorage.setItem("loggedProvider", JSON.stringify(updatedData));
-          
-          currentProviderId.value = mappedPid;
-          return mappedPid;
-        }
-        
-        throw new Error(`No PID mapping found for provider: ${providerData._id}`);
-        
-      } catch (err) {
-        console.error("❌ Error getting provider ID:", err);
-        error.value = "Authentication error: " + err.message;
-        return null;
-      }
-    };
+    const totalPages = computed(() => Math.ceil(displayBookings.value.length / itemsPerPage.value));
 
     // ==================== DATA PROCESSING ====================
-
-    const extractCustomerData = (booking) => {
-      const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
-      
-      if (isAdminBooking) {
-        return {
-          customerId: null,
-          fullname: 'Admin',
-          email: booking.adminEmail || '',
-          phone: booking.adminPhone || '',
-          location: booking.adminLocation || '',
-          isAdminBooking: true,
-          originalAdminData: {
-            adminName: booking.adminName || booking.createdByName || 'Admin User',
-            adminEmail: booking.adminEmail || '',
-            adminPhone: booking.adminPhone || '',
-            adminId: booking.adminId || booking.createdBy || 'admin'
-          }
-        };
-      }
-      
-      if (booking.customer && typeof booking.customer === 'object') {
-        return {
-          customerId: booking.customer._id || booking.customer.id,
-          fullname: booking.customer.fullname || booking.customer.name || 'Customer',
-          email: booking.customer.email || '',
-          phone: booking.customer.phone || '',
-          location: booking.customer.location || booking.customer.address || '',
-          isAdminBooking: false,
-          originalCustomer: booking.customer
-        };
-      }
-      
-      if (booking.customerName || booking.customerEmail) {
-        return {
-          customerId: booking.customerId || booking.userId,
-          fullname: booking.customerName || 'Customer',
-          email: booking.customerEmail || '',
-          phone: booking.customerPhone || '',
-          location: booking.customerLocation || '',
-          isAdminBooking: false
-        };
-      }
-      
-      if (booking.user && typeof booking.user === 'object') {
-        return {
-          customerId: booking.user._id || booking.user.id,
-          fullname: booking.user.fullname || booking.user.name || 'Customer',
-          email: booking.user.email || '',
-          phone: booking.user.phone || '',
-          location: booking.user.location || booking.user.address || '',
-          isAdminBooking: false,
-          originalCustomer: booking.user
-        };
-      }
-      
-      return {
-        customerId: null,
-        fullname: 'Admin',
-        email: '',
-        phone: '',
-        location: '',
-        isAdminBooking: true,
-        originalAdminData: {
-          adminName: 'Admin User',
-          adminEmail: '',
-          adminPhone: '',
-          adminId: booking.adminId || booking.createdBy || 'admin'
-        }
-      };
-    };
-
-    const enhanceBookingDisplay = (booking, customerData) => {
-      const service = booking.service || {};
-      
-      return {
-        _id: booking._id || booking.bookingId || booking.id,
-        customerId: customerData.customerId,
-        providerId: booking.providerId || booking.provider?._id,
-        customerName: customerData.fullname,
-        customerEmail: customerData.email,
-        customerPhone: customerData.phone,
-        customerLocation: customerData.location,
-        isAdminBooking: customerData.isAdminBooking,
-        serviceName: service.title || service.name || booking.serviceName || 'Unknown Service',
-        serviceCategory: service.categoryName || service.category || booking.serviceCategory || 'General',
-        bookingDate: booking.bookingDate || booking.date || booking.appointmentDate,
-        startTime: booking.startTime || booking.time,
-        endTime: booking.endTime,
-        duration: booking.duration,
-        status: (booking.status || 'pending').toLowerCase(),
-        amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
-        createdAt: booking.createdAt || booking.bookingTime,
-        notes: booking.notes || booking.specialRequirements,
-        originalData: booking
-      };
-    };
-
     const processBookings = (apiBookings) => {
-      if (!apiBookings) {
-        console.warn("⚠️ No data received from API");
-        return [];
-      }
+      if (!apiBookings) return [];
       
       let bookingsArray = [];
       
+      // Handle different response structures
       if (Array.isArray(apiBookings)) {
         bookingsArray = apiBookings;
       } else if (apiBookings.bookings && Array.isArray(apiBookings.bookings)) {
@@ -1188,518 +909,143 @@ export default {
       } else if (apiBookings.data && Array.isArray(apiBookings.data)) {
         bookingsArray = apiBookings.data;
       } else {
-        console.warn("⚠️ Unexpected API response structure:", apiBookings);
+        console.warn("❌ Unexpected API response structure:", apiBookings);
         return [];
       }
 
-      console.log(`📊 Processing ${bookingsArray.length} bookings...`);
-
       const processedBookings = bookingsArray.map(booking => {
-        const customerData = extractCustomerData(booking);
-        return enhanceBookingDisplay(booking, customerData);
+        const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
+        
+        // Clean up customer name
+        let customerName = 'Customer';
+        if (isAdminBooking) {
+          customerName = 'Store Client';
+        } else if (booking.customer?.fullname) {
+          customerName = booking.customer.fullname.replace('Admin confirmed', '').trim();
+        } else if (booking.customerName) {
+          customerName = booking.customerName.replace('Admin confirmed', '').trim();
+        }
+        
+        // Clean up service name
+        let serviceName = 'Service';
+        if (booking.service?.title) {
+          serviceName = booking.service.title.replace('aqssssssssssssssssssssssssssssss', '').trim();
+        } else if (booking.serviceName) {
+          serviceName = booking.serviceName.replace('aqssssssssssssssssssssssssssssss', '').trim();
+        }
+
+        return {
+          _id: booking._id || booking.bookingId || `booking-${Date.now()}-${Math.random()}`,
+          customerId: booking.customer?._id,
+          customerName: customerName,
+          customerEmail: isAdminBooking ? (booking.adminEmail || '') : (booking.customer?.email || ''),
+          customerPhone: isAdminBooking ? (booking.adminPhone || '') : (booking.customer?.phone || ''),
+          isAdminBooking: isAdminBooking,
+          serviceName: serviceName,
+          serviceCategory: booking.service?.category || booking.serviceCategory || 'General',
+          bookingDate: booking.bookingDate || booking.date || booking.appointmentDate,
+          startTime: booking.startTime || booking.time || '09:00',
+          endTime: booking.endTime || '11:00',
+          status: (booking.status || 'pending').toLowerCase(),
+          amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
+          createdAt: booking.createdAt || new Date().toISOString(),
+          originalData: booking
+        };
       });
 
+      // Sort by booking date (newest first)
       processedBookings.sort((a, b) => {
-        const dateA = new Date(a.bookingDate || a.createdAt);
-        const dateB = new Date(b.bookingDate || b.createdAt);
-        return dateB - dateA;
+        const dateA = a.bookingDate ? new Date(a.bookingDate) : new Date();
+        const dateB = b.bookingDate ? new Date(b.bookingDate) : new Date();
+        return dateB - dateA; // Descending order
       });
 
       return processedBookings;
     };
 
-    // ==================== CORS-FRIENDLY API CALL ====================
-
-    const makeCorsSafeRequest = async (url, options = {}) => {
-      // For deployed environment, use minimal headers to avoid CORS preflight
-      if (isDeployed.value) {
-        const safeOptions = {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        };
-        return await http.get(url, safeOptions);
-      }
-      
-      // For local development, use normal headers
-      return await http.get(url, options);
+    // ==================== FORMATTING FUNCTIONS ====================
+    const formatCustomerName = (name) => {
+      if (!name) return 'Customer';
+      return name
+        .replace(/Admin confirmed/gi, '')
+        .replace(/aqssss+/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
     };
 
-    // ==================== LOAD BOOKINGS (FIXED FOR DEPLOYMENT) ====================
-
-    const loadBookings = async () => {
-      const providerId = getProviderId();
-      
-      if (!providerId) {
-        loading.value = false;
-        return;
-      }
-
-      loading.value = true;
-      loadingProgress.value = 0;
-      error.value = "";
-      errorStatus.value = "";
-      usingSampleData.value = false;
-
-      let progressInterval;
-
-      try {
-        console.log("🚀 Loading bookings for provider:", providerId);
-        console.log("🌐 Environment:", isDeployed.value ? "Deployed (Vercel)" : "Local");
-
-        // Progress simulation
-        progressInterval = setInterval(() => {
-          if (loadingProgress.value < 90) {
-            loadingProgress.value += 10;
-          }
-        }, 200);
-
-        // Try to load from cache first
-        try {
-          const cachedBookings = localStorage.getItem(`cachedBookings_${providerId}`);
-          if (cachedBookings) {
-            const cachedData = JSON.parse(cachedBookings);
-            if (Date.now() - cachedData.timestamp < 300000) { // 5 minutes
-              console.log("🔄 Using cached bookings data");
-              bookings.value = cachedData.bookings;
-              calculateStats();
-              loading.value = false;
-              clearInterval(progressInterval);
-              loadingProgress.value = 100;
-              setTimeout(() => { loadingProgress.value = 0; }, 500);
-              return;
-            }
-          }
-        } catch (cacheErr) {
-          console.log("❌ Cache load error:", cacheErr);
-        }
-
-        // API call with CORS-safe configuration
-        const endpoint = `/bookings/provider/${providerId}`;
-        currentEndpoint.value = endpoint;
-        
-        console.log("📡 Calling endpoint:", endpoint);
-        
-        // Use CORS-safe request
-        const response = await makeCorsSafeRequest(endpoint, {
-          timeout: 10000
-        });
-        
-        clearInterval(progressInterval);
-        loadingProgress.value = 100;
-
-        console.log("✅ API Response received:", response.data);
-        
-        const processedBookings = processBookings(response.data);
-        bookings.value = processedBookings;
-        
-        // Cache successful response
-        try {
-          localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
-            bookings: processedBookings,
-            timestamp: Date.now(),
-            isSample: false
-          }));
-        } catch (cacheErr) {
-          console.log("❌ Cache save error:", cacheErr);
-        }
-        
-        console.log(`✅ Processed ${processedBookings.length} bookings`);
-        calculateStats();
-
-      } catch (err) {
-        console.error("❌ Load Error:", err);
-        
-        if (progressInterval) {
-          clearInterval(progressInterval);
-        }
-        
-        // Specific CORS error handling
-        if (err.message?.includes('CORS') || err.code === 'CORS_ERROR') {
-          errorStatus.value = "CORS Error";
-          error.value = "Server is blocking cross-origin requests. ";
-          
-          // Try alternative fetch method for deployed environment
-          if (isDeployed.value) {
-            error.value += "Trying alternative method...";
-            await tryAlternativeFetch(providerId);
-            return;
-          }
-        }
-        
-        // Handle other errors
-        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-          errorStatus.value = "Timeout Error";
-          error.value = "The server is taking too long to respond.";
-        } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-          errorStatus.value = "Network Error";
-          error.value = "Cannot connect to server. Please check your connection.";
-        } else if (err.response?.status === 403) {
-          const errorMessage = err.response?.data?.message || err.message || '';
-          if (errorMessage.includes("Providers can only access their own bookings")) {
-            console.log("✅ No bookings found for this provider");
-            error.value = "";
-            bookings.value = [];
-            calculateStats();
-            return;
-          }
-          error.value = "Access denied. Please check your permissions.";
-          errorStatus.value = "403 Forbidden";
-        } else if (err.response?.status === 404) {
-          error.value = "Bookings endpoint not found.";
-          errorStatus.value = "404 Not Found";
-        } else {
-          error.value = err.message || "Unknown error occurred";
-          errorStatus.value = "API Error";
-        }
-        
-        // Fall back to sample data
-        await loadSampleBookings(providerId);
-        
-      } finally {
-        loading.value = false;
-        if (progressInterval) {
-          clearInterval(progressInterval);
-        }
-        setTimeout(() => { loadingProgress.value = 0; }, 500);
-      }
+    const formatServiceName = (name) => {
+      if (!name) return 'Service';
+      return name
+        .replace(/aqssss+/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
     };
 
-    // ==================== ALTERNATIVE FETCH FOR CORS ISSUES ====================
-
-    const tryAlternativeFetch = async (providerId) => {
-      console.log("🔄 Trying alternative fetch (direct fetch API)...");
-      
-      try {
-        // Use fetch API directly with minimal headers
-        const response = await fetch(
-          `https://infinity-booking-backend1-1.onrender.com/infinity-booking/bookings/provider/${providerId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            mode: 'cors'
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log("✅ Alternative fetch succeeded");
-          
-          const processedBookings = processBookings(data);
-          bookings.value = processedBookings;
-          calculateStats();
-          
-          // Cache the data
-          localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
-            bookings: processedBookings,
-            timestamp: Date.now(),
-            isSample: false
-          }));
-          
-          error.value = "";
-          errorStatus.value = "";
-          return true;
-        } else {
-          throw new Error(`Fetch failed with status: ${response.status}`);
-        }
-      } catch (fetchErr) {
-        console.error("❌ Alternative fetch failed:", fetchErr);
-        await loadSampleBookings(providerId);
-        return false;
-      }
-    };
-
-    // ==================== SAMPLE DATA ====================
-
-    const loadSampleBookings = async (providerId) => {
-      console.log("📋 Loading sample bookings");
-      
-      usingSampleData.value = true;
-      
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const lastWeek = new Date(today);
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      
-      const sampleBookings = [
-        {
-          _id: "sample_1_" + Date.now(),
-          customer: {
-            _id: "cust_1",
-            fullname: "John Smith",
-            email: "john@example.com",
-            phone: "+1234567890",
-            location: "New York"
-          },
-          service: {
-            name: "Haircut & Styling",
-            category: { name: "Hair Services" },
-            price: 45
-          },
-          bookingDate: today.toISOString().split('T')[0],
-          startTime: "14:00",
-          endTime: "15:00",
-          status: "confirmed",
-          totalPrice: 45,
-          createdAt: yesterday.toISOString(),
-          notes: "Regular customer"
-        },
-        {
-          _id: "sample_2_" + Date.now(),
-          createdBy: "admin",
-          adminName: "Store Manager",
-          adminEmail: "manager@store.com",
-          adminPhone: "+1234567891",
-          service: {
-            name: "Beard Trim",
-            category: { name: "Grooming" },
-            price: 25
-          },
-          bookingDate: today.toISOString().split('T')[0],
-          startTime: "16:00",
-          endTime: "16:30",
-          status: "pending",
-          totalPrice: 25,
-          createdAt: today.toISOString(),
-          notes: "Walk-in customer"
-        }
-      ];
-
-      const processedBookings = processBookings(sampleBookings);
-      bookings.value = processedBookings;
-      
-      try {
-        localStorage.setItem(`cachedBookings_${providerId}`, JSON.stringify({
-          bookings: processedBookings,
-          timestamp: Date.now(),
-          isSample: true
-        }));
-      } catch (cacheErr) {
-        console.log("❌ Cache save error:", cacheErr);
-      }
-      
-      console.log(`✅ Loaded ${processedBookings.length} sample bookings`);
-      calculateStats();
-      
-      if (isDeployed.value) {
-        error.value = "Using sample data (CORS issue with backend). Real bookings will load when CORS is fixed.";
-      } else {
-        error.value = "Using sample data (server issue).";
-      }
-      errorStatus.value = "Sample Data";
-    };
-
-    // ==================== CORE FUNCTIONS ====================
-
-    const calculateDuration = (startTime, endTime) => {
-      if (!startTime || !endTime) return null;
-      try {
-        const start = new Date(`2000-01-01T${startTime}`);
-        const end = new Date(`2000-01-01T${endTime}`);
-        return Math.round((end - start) / (1000 * 60));
-      } catch (err) {
-        return null;
-      }
-    };
-
-    const calculateStats = () => {
-      if (bookings.value.length === 0) {
-        stats.value = { totalBookings: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, revenue: 0 };
-        return;
-      }
-
-      stats.value = {
-        totalBookings: bookings.value.length,
-        pending: bookings.value.filter(b => b.status === 'pending').length,
-        confirmed: bookings.value.filter(b => b.status === 'confirmed').length,
-        completed: bookings.value.filter(b => b.status === 'completed').length,
-        cancelled: bookings.value.filter(b => b.status === 'cancelled').length,
-        revenue: bookings.value
-          .filter(b => b.status !== 'cancelled')
-          .reduce((sum, booking) => sum + (parseFloat(booking.amount) || 0), 0)
-          .toFixed(2)
-      };
-    };
-
-    const checkProviderStatus = () => {
-      const providerData = JSON.parse(localStorage.getItem("loggedProvider") || "{}");
-      
-      let statusMessage = `🔍 Provider Status Check:\n\n`;
-      statusMessage += `👤 Name: ${providerData.fullname}\n`;
-      statusMessage += `📧 Email: ${providerData.email}\n`;
-      statusMessage += `🎫 Provider PID: ${currentProviderId.value}\n`;
-      statusMessage += `🌐 Environment: ${isDeployed.value ? 'Deployed (Vercel)' : 'Local'}\n`;
-      statusMessage += `📊 Data Source: ${usingSampleData.value ? 'Sample Data' : 'Real API'}\n\n`;
-      statusMessage += `📈 Booking Statistics:\n`;
-      statusMessage += `   Total Bookings: ${stats.value.totalBookings}\n`;
-      statusMessage += `   Pending: ${stats.value.pending} | Confirmed: ${stats.value.confirmed}\n`;
-      statusMessage += `   Completed: ${stats.value.completed} | Revenue: $${stats.value.revenue}\n`;
-      
-      if (error.value) {
-        statusMessage += `\n⚠️ Error: ${error.value}`;
-      }
-      
-      alert(statusMessage);
-    };
-
-    // ==================== ACTION METHODS ====================
-
-    const refreshBookings = () => {
-      loadBookings();
-    };
-
-    const clearFilters = () => {
-      searchQuery.value = "";
-      statusFilter.value = "all";
-      clearTimelinePeriod(); // This now clears the timeline filter too
-    };
-
-    const confirmBooking = async (booking) => {
-      try {
-        await http.patch(`/bookings/${booking._id}/status`, { status: 'confirmed' });
-        booking.status = 'confirmed';
-        calculateStats();
-      } catch (err) {
-        console.error('Error confirming booking:', err);
-        alert("Failed to confirm booking. Please try again.");
-      }
-    };
-
-    const completeBooking = async (booking) => {
-      try {
-        await http.patch(`/bookings/${booking._id}/status`, { status: 'completed' });
-        booking.status = 'completed';
-        calculateStats();
-      } catch (err) {
-        console.error('Error completing booking:', err);
-        alert("Failed to complete booking. Please try again.");
-      }
-    };
-
-    const viewBookingDetailsModal = (booking) => {
-      selectedBooking.value = booking;
-      showOriginalData.value = false;
-    };
-
-    const closeModal = () => {
-      selectedBooking.value = null;
-    };
-
-    const promoteServices = () => {
-      alert("🎯 Share your booking link to get more bookings!");
-    };
-
-    const viewServices = () => {
-      alert("Redirecting to services page...");
-    };
-
-    const testConnection = async () => {
-      const providerId = getProviderId();
-      if (!providerId) return;
-      
-      try {
-        const testUrl = `https://infinity-booking-backend1-1.onrender.com/infinity-booking/bookings/provider/${providerId}`;
-        const response = await fetch(testUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        });
-        
-        if (response.ok) {
-          alert(`✅ Connection test successful!\n\nServer is reachable but CORS might be blocking the request.\n\nStatus: ${response.status}\nURL: ${testUrl}`);
-        } else {
-          alert(`❌ Connection test failed:\n\nStatus: ${response.status}\nURL: ${testUrl}`);
-        }
-      } catch (err) {
-        alert(`❌ Connection test failed:\n\nError: ${err.message}\n\nThe server might be down.`);
-      }
-    };
-
-    // ==================== UTILITY GETTERS ====================
-
-    const getCustomerName = (booking) => {
-      if (booking.isAdminBooking) {
-        return booking.originalData?.adminName || 'Admin';
-      }
-      return booking.customerName || 'Customer';
-    };
-
-    const getCustomerEmail = (booking) => {
-      if (booking.isAdminBooking) {
-        return booking.originalData?.adminEmail || '';
-      }
-      return booking.customerEmail || '';
-    };
-
-    const getCustomerPhone = (booking) => {
-      if (booking.isAdminBooking) {
-        return booking.originalData?.adminPhone || '';
-      }
-      return booking.customerPhone || '';
-    };
-
-    const getServiceName = (booking) => {
-      return booking.serviceName || 
-             booking.originalData?.service?.name ||
-             'Unknown Service';
-    };
-
-    const getCategoryName = (booking) => {
-      return booking.serviceCategory || 
-             booking.originalData?.service?.category?.name ||
-             'General';
-    };
-
-    const getBookingAmount = (booking) => {
-      return parseFloat(booking.amount || 0).toFixed(2);
-    };
-
-    const formatStatus = (status) => {
-      const statusMap = {
-        pending: 'Pending',
-        confirmed: 'Confirmed',
-        completed: 'Completed',
-        cancelled: 'Cancelled'
-      };
-      return statusMap[status] || status;
-    };
-
-    const formatPaymentStatus = (status) => {
-      const statusMap = {
-        paid: 'Paid',
-        pending: 'Pending',
-        failed: 'Failed'
-      };
-      return statusMap[status] || status;
-    };
-
-    const getInitials = (name) => {
-      if (!name) return '??';
-      if (name === 'Admin' || name.includes('Admin')) return 'AD';
-      return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-    };
-
-    const formatDate = (dateString) => {
+    const formatCleanDate = (dateString) => {
       if (!dateString) return 'No date';
       try {
-        return new Date(dateString).toLocaleDateString('en-US', {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid date';
+        return date.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
           year: 'numeric'
         });
       } catch (err) {
-        return 'Invalid Date';
+        return 'Invalid date';
+      }
+    };
+
+    const formatTimeSlot = (startTime, endTime) => {
+      if (!startTime || !endTime) return 'No time';
+      return `${startTime} - ${endTime}`;
+    };
+
+    const getCleanInitials = (name) => {
+      const cleanName = formatCustomerName(name);
+      if (!cleanName) return '??';
+      if (cleanName === 'Store Client') return 'SC';
+      return cleanName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    };
+
+    const formatStatus = (status) => {
+      const statusMap = {
+        confirmed: 'Confirmed',
+        completed: 'Completed',
+        pending: 'Pending',
+        cancelled: 'Cancelled'
+      };
+      return statusMap[status] || status.charAt(0).toUpperCase() + status.slice(1);
+    };
+
+    const getTimeUntilBooking = (bookingDate) => {
+      if (!bookingDate) return '';
+      try {
+        const now = new Date();
+        const booking = new Date(bookingDate);
+        const diffMs = booking - now;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) return 'Past booking';
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Tomorrow';
+        if (diffDays < 7) return `${diffDays} days`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
+        return 'Later';
+      } catch (err) {
+        return '';
       }
     };
 
     const formatRelativeTime = (dateString) => {
-      if (!dateString) return 'Unknown time';
+      if (!dateString) return '';
       try {
         const date = new Date(dateString);
         const now = new Date();
@@ -1708,53 +1054,156 @@ export default {
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
 
-        if (diffMins < 1) return 'Just now';
+        if (diffMins < 1) return 'just now';
         if (diffMins < 60) return `${diffMins}m ago`;
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 7) return `${diffDays}d ago`;
-        return formatDate(dateString);
+        return formatCleanDate(dateString);
       } catch (err) {
-        return 'Unknown time';
+        return '';
       }
     };
 
-    const isNewBooking = (booking) => {
-      if (!booking.createdAt) return false;
+    // ==================== CORE FUNCTIONS ====================
+    const calculateDuration = (startTime, endTime) => {
+      if (!startTime || !endTime) return 0;
       try {
-        const created = new Date(booking.createdAt);
-        const now = new Date();
-        const diffHours = (now - created) / (1000 * 60 * 60);
-        return diffHours < 24;
+        const start = new Date(`2000-01-01T${startTime}`);
+        const end = new Date(`2000-01-01T${endTime}`);
+        return Math.round((end - start) / (1000 * 60));
       } catch (err) {
-        return false;
+        return 0;
       }
     };
 
-    const isUrgentBooking = (booking) => {
-      if (booking.status !== 'pending') return false;
-      if (!booking.bookingDate) return false;
-      try {
-        const bookingDate = new Date(booking.bookingDate);
-        const now = new Date();
-        const diffHours = (bookingDate - now) / (1000 * 60 * 60);
-        return diffHours < 24 && diffHours > 0;
-      } catch (err) {
-        return false;
+    const calculateStats = () => {
+      if (bookings.value.length === 0) {
+        stats.value = { totalBookings: 0, today: 0, upcoming: 0, completed: 0, revenue: 0 };
+        return;
       }
+
+      stats.value = {
+        totalBookings: bookings.value.length,
+        today: bookings.value.filter(b => isTodayBooking(b)).length,
+        upcoming: bookings.value.filter(b => !isPastBooking(b) && b.status !== 'cancelled').length,
+        completed: bookings.value.filter(b => b.status === 'completed').length,
+        revenue: bookings.value
+          .filter(b => b.status !== 'cancelled')
+          .reduce((sum, booking) => sum + (parseFloat(booking.amount) || 0), 0)
+          .toFixed(2)
+      };
+    };
+
+    const getBookingAmount = (booking) => parseFloat(booking.amount || 0).toFixed(2);
+
+    // ==================== ACTION FUNCTIONS ====================
+    const selectTimelinePeriod = (periodId) => {
+      selectedPeriod.value = periodId;
+      currentPage.value = 1;
+    };
+
+    const clearTimelinePeriod = () => {
+      selectedPeriod.value = "all";
+      currentPage.value = 1;
+    };
+
+    const clearFilters = () => {
+      searchQuery.value = "";
+      statusFilter.value = "all";
+      clearTimelinePeriod();
+      currentPage.value = 1;
+    };
+
+    const completeBooking = async (booking) => {
+      try {
+        await http.patch(`/bookings/${booking._id}/status`, { status: 'completed' });
+        booking.status = 'completed';
+        calculateStats();
+        alert("✅ Booking marked as completed!");
+      } catch (err) {
+        console.error('Error completing booking:', err);
+        alert("Failed to complete booking. Please try again.");
+      }
+    };
+
+    const viewBookingDetailsModal = (booking) => {
+      selectedBooking.value = booking;
+    };
+
+    const closeModal = () => {
+      selectedBooking.value = null;
+    };
+
+    const contactCustomer = (booking) => {
+      if (booking.customerEmail) {
+        window.location.href = `mailto:${booking.customerEmail}`;
+      } else {
+        alert("No email address available for this customer.");
+      }
+    };
+
+    const promoteServices = () => {
+      alert("🎯 Share your booking link to get more bookings!\n\nTo promote your services:\n1. Share your unique booking link\n2. Post on social media\n3. Ask satisfied clients for referrals\n4. List on local business directories");
+    };
+
+    const getActiveFilterLabel = () => {
+      if (selectedPeriod.value === "all") return "Future";
+      const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
+      return period ? period.label : "";
+    };
+
+    const showDebugInfo = () => {
+      showDebug.value = !showDebug.value;
+      debugLocalStorageKeys.value = Array.from({length: localStorage.length}, (_, i) => 
+        localStorage.key(i)
+      ).join(", ");
+    };
+
+    const copyDebugInfo = () => {
+      const debugText = `Provider ID: ${debugProviderId.value}\nToken Exists: ${debugHasToken.value}\nEndpoint: ${debugApiEndpoint.value}\nLocalStorage Keys: ${debugLocalStorageKeys.value}`;
+      navigator.clipboard.writeText(debugText);
+      alert("Debug info copied to clipboard!");
+    };
+
+    const exportBookings = () => {
+      if (bookings.value.length === 0) {
+        alert("No bookings to export.");
+        return;
+      }
+      
+      const csvContent = [
+        ['Customer Name', 'Email', 'Service', 'Date', 'Time', 'Status', 'Amount'].join(','),
+        ...bookings.value.map(b => [
+          `"${b.customerName}"`,
+          `"${b.customerEmail || ''}"`,
+          `"${b.serviceName}"`,
+          `"${formatCleanDate(b.bookingDate)}"`,
+          `"${b.startTime} - ${b.endTime}"`,
+          `"${formatStatus(b.status)}"`,
+          `"$${b.amount}"`
+        ].join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bookings-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
     };
 
     // ==================== LIFECYCLE ====================
-
     onMounted(() => {
+      console.log("📅 BookingsSection mounted");
       loadBookings();
     });
 
     return {
-      // Data
+      // State
       loading,
       loadingProgress,
       error,
-      errorStatus,
       bookings,
       searchQuery,
       statusFilter,
@@ -1764,18 +1213,17 @@ export default {
       currentPage,
       itemsPerPage,
       selectedBooking,
-      currentProviderId,
-      currentEndpoint,
-      stats,
-      showOriginalData,
       showDebug,
-      usingSampleData,
-      isDeployed,
+      lastUpdatedTime,
       
-      // NEW: Custom date range variables
-      customStartDate,
-      customEndDate,
-      customDateError,
+      // Debug
+      debugProviderId,
+      debugHasToken,
+      debugApiEndpoint,
+      debugLocalStorageKeys,
+      
+      // Stats
+      stats,
       
       // Computed
       displayBookings,
@@ -1785,38 +1233,31 @@ export default {
       
       // Methods
       loadBookings,
-      refreshBookings,
       clearFilters,
-      confirmBooking,
       completeBooking,
       viewBookingDetailsModal,
-      checkProviderStatus,
-      promoteServices,
-      viewServices,
+      closeModal,
+      contactCustomer,
       selectTimelinePeriod,
       clearTimelinePeriod,
-      clearCustomRange,
-      applyCustomRange,
-      closeModal,
-      testConnection,
-      
-      // Utility functions
+      promoteServices,
       getActiveFilterLabel,
-      getInitials,
-      formatDate,
-      formatDateDisplay,
-      formatRelativeTime,
-      isNewBooking,
-      isUrgentBooking,
-      getCustomerName,
-      getCustomerEmail,
-      getCustomerPhone,
-      getServiceName,
-      getCategoryName,
+      showDebugInfo,
+      copyDebugInfo,
+      exportBookings,
+      
+      // Formatting
+      getCleanInitials,
+      formatCleanDate,
+      formatCustomerName,
+      formatServiceName,
       getBookingAmount,
       formatStatus,
-      formatPaymentStatus,
-      calculateDuration
+      calculateDuration,
+      formatTimeSlot,
+      getTimeUntilBooking,
+      formatRelativeTime,
+      isTodayBooking
     };
   }
 };
@@ -1827,9 +1268,9 @@ export default {
 .bookings-section {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px;
-  font-family: "Poppins", sans-serif;
-  background: #f8fafc;
+  padding: 20px;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   min-height: 100vh;
 }
 
@@ -1837,39 +1278,206 @@ export default {
 .header {
   background: white;
   border-radius: 16px;
-  padding: 24px;
+  padding: 24px 32px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .title-section .title {
-  font-size: 2.25rem;
-  color: #1e293b;
-  font-weight: 700;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
 }
 
 .title-section .subtitle {
   color: #64748b;
-  font-size: 1.1rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  font-weight: 500;
 }
 
-.header-actions {
+.btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  font-size: 0.95rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid #e2e8f0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.btn-outline:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+/* Loading State */
+.loading-container {
+  min-height: 400px;
+  padding: 40px;
   display: flex;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Statistics Overview */
+.loading-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.spinner-large {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #f1f5f9;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+.loading-progress {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar {
+  width: 300px;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #1e40af);
+  transition: width 0.3s ease;
+}
+
+/* Error State */
+.error-container {
+  min-height: 400px;
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-content {
+  text-align: center;
+  max-width: 600px;
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.error-icon {
+  font-size: 4rem;
+  color: #ef4444;
+  margin-bottom: 20px;
+}
+
+.error-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.debug-info {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.debug-info h4 {
+  margin-top: 0;
+  color: #1e293b;
+}
+
+.debug-info p {
+  margin: 5px 0;
+  color: #64748b;
+}
+
+/* Success Empty State */
+.success-empty-state {
+  min-height: 400px;
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.success-icon {
+  font-size: 4rem;
+  color: #10b981;
+  margin-bottom: 20px;
+}
+
+.success-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Statistics */
 .stats-overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1880,72 +1488,79 @@ export default {
 .stat-card {
   background: white;
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  transition: all 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
-.stat-icon.total { background: #dbeafe; color: #1e40af; }
-.stat-icon.pending { background: #fef3c7; color: #d97706; }
-.stat-icon.confirmed { background: #dcfce7; color: #16a34a; }
-.stat-icon.completed { background: #f3e8ff; color: #9333ea; }
-.stat-icon.revenue { background: #fce7f3; color: #db2777; }
+.stat-icon.total { background: linear-gradient(135deg, #dbeafe, #93c5fd); color: #1e40af; }
+.stat-icon.today { background: linear-gradient(135deg, #fef3c7, #fcd34d); color: #d97706; }
+.stat-icon.upcoming { background: linear-gradient(135deg, #dcfce7, #86efac); color: #16a34a; }
+.stat-icon.completed { background: linear-gradient(135deg, #f3e8ff, #d8b4fe); color: #9333ea; }
+.stat-icon.revenue { background: linear-gradient(135deg, #fce7f3, #f9a8d4); color: #db2777; }
 
 .stat-content h3 {
   font-size: 2rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #1e293b;
   margin-bottom: 4px;
+  line-height: 1;
 }
 
 .stat-content p {
   color: #64748b;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* API Status */
 .api-status {
-  padding: 12px 16px;
+  padding: 12px 20px;
   border-radius: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .api-status.success {
-  background: #dcfce7;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
   color: #16a34a;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #86efac;
 }
 
-/* Filters Section */
+/* Filters */
 .filters-section {
   background: white;
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
 }
 
 .filters-row {
@@ -1967,318 +1582,49 @@ export default {
   top: 50%;
   transform: translateY(-50%);
   color: #64748b;
+  font-size: 1rem;
 }
 
 .search-input {
   width: 100%;
-  padding: 12px 16px 12px 48px;
+  padding: 14px 20px 14px 48px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   font-size: 1rem;
-  transition: border-color 0.2s ease;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .search-input:focus {
   outline: none;
   border-color: #3b82f6;
-}
-
-.filter-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .filter-select {
-  padding: 12px 16px;
+  padding: 14px 20px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   background: white;
-  font-size: 0.9rem;
-  min-width: 140px;
-}
-
-.btn {
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 500;
+  min-width: 150px;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
 }
 
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #2563eb;
-  transform: translateY(-1px);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 2px solid #e2e8f0;
-  color: #64748b;
-}
-
-.btn-outline:hover {
+.filter-select:focus {
+  outline: none;
   border-color: #3b82f6;
-  color: #3b82f6;
 }
 
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 0.8rem;
-}
-
-.btn-success {
-  background: #10b981;
-  color: white;
-}
-
-.btn-success:hover {
-  background: #059669;
-}
-
-/* Loading State */
-.loading-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-}
-
-.loading-content {
-  text-align: center;
-  padding: 48px;
-}
-
-.spinner-large {
-  width: 64px;
-  height: 64px;
-  border: 4px solid #f1f5f9;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 24px;
-}
-
-.loading-content h3 {
-  color: #1e293b;
-  margin-bottom: 12px;
-}
-
-.loading-content p {
-  color: #64748b;
-  margin-bottom: 24px;
-}
-
-.loading-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 300px;
-  margin: 0 auto;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 8px;
-  background: #f1f5f9;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-/* Error State */
-.error-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-}
-
-.error-content {
-  text-align: center;
-  padding: 48px;
-  max-width: 500px;
-}
-
-.error-icon {
-  width: 80px;
-  height: 80px;
-  background: #fee2e2;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 24px;
-  color: #dc2626;
-  font-size: 2rem;
-}
-
-.error-content h3 {
-  color: #1e293b;
-  margin-bottom: 12px;
-  font-size: 1.5rem;
-}
-
-.error-content p {
-  color: #64748b;
-  margin-bottom: 32px;
-  line-height: 1.6;
-}
-
-.error-details {
-  margin: 16px 0;
-  padding: 12px;
-  background: #fef2f2;
-  border-radius: 8px;
-  font-size: 0.8rem;
-}
-
-.error-details p {
-  margin: 4px 0;
-  color: #dc2626;
-}
-
-.error-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-/* Success Empty State */
-.success-empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-}
-
-.success-content {
-  text-align: center;
-  padding: 48px;
-  max-width: 600px;
-}
-
-.success-icon {
-  width: 120px;
-  height: 120px;
-  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 32px;
-  color: #16a34a;
-  font-size: 3rem;
-}
-
-.success-content h3 {
-  color: #16a34a;
-  font-size: 1.8rem;
-  margin-bottom: 16px;
-}
-
-.success-content p {
-  color: #64748b;
-  font-size: 1.1rem;
-  margin-bottom: 32px;
-  line-height: 1.6;
-}
-
-.success-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 40px;
-  flex-wrap: wrap;
-}
-
-.success-tips h4 {
-  color: #1e293b;
-  margin-bottom: 20px;
-  font-size: 1.2rem;
-}
-
-.tips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.tip-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 20px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border-left: 4px solid #3b82f6;
-  text-align: left;
-}
-
-.tip-card i {
-  color: #3b82f6;
-  font-size: 1.2rem;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.tip-card strong {
-  color: #1e293b;
-  display: block;
-  margin-bottom: 4px;
-  font-size: 0.9rem;
-}
-
-.tip-card p {
-  color: #64748b;
-  font-size: 0.8rem;
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* Main Content Layout */
-.main-content {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-}
-
-/* TIMELINE FILTER SECTION (UPDATED) */
+/* Timeline Filter */
 .timeline-filter-section {
   background: white;
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
 }
 
 .timeline-filter-header {
@@ -2287,15 +1633,12 @@ export default {
 
 .timeline-filter-header h3 {
   color: #1e293b;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
+  font-weight: 700;
   margin: 0 0 8px 0;
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.timeline-filter-header h3 i {
-  color: #3b82f6;
 }
 
 .timeline-filter-subtitle {
@@ -2306,130 +1649,42 @@ export default {
 
 .timeline-filter-buttons {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 20px;
 }
 
 .timeline-filter-btn {
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: #f8fafc;
   border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   color: #475569;
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .timeline-filter-btn:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
+  transform: translateY(-2px);
 }
 
 .timeline-filter-btn.active {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  border-color: transparent;
   color: white;
-}
-
-.timeline-filter-btn.active i {
-  color: white;
-}
-
-/* Custom Range Picker */
-.custom-range-picker {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 16px;
-  margin-bottom: 20px;
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.custom-range-header {
-  margin-bottom: 16px;
-}
-
-.custom-range-header h4 {
-  color: #1e293b;
-  font-size: 1rem;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.custom-range-header i {
-  color: #3b82f6;
-}
-
-.date-inputs {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.date-input-group {
-  flex: 1;
-  min-width: 200px;
-}
-
-.date-input-group label {
-  display: block;
-  color: #475569;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-
-.date-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: border-color 0.2s ease;
-}
-
-.date-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-}
-
-.custom-range-error {
-  color: #dc2626;
-  font-size: 0.85rem;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: #fee2e2;
-  border-radius: 6px;
-  border: 1px solid #fecaca;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .timeline-active-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   padding: 16px;
-  background: #f0f9ff;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
   border-radius: 12px;
   border: 1px solid #bae6fd;
 }
@@ -2447,16 +1702,12 @@ export default {
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #0369a1;
   display: flex;
   align-items: center;
   gap: 8px;
   box-shadow: 0 2px 8px rgba(3, 105, 161, 0.1);
-}
-
-.active-filter-badge i {
-  color: #0ea5e9;
 }
 
 .clear-period-btn {
@@ -2471,40 +1722,28 @@ export default {
   cursor: pointer;
   color: #64748b;
   font-size: 0.8rem;
-  transition: all 0.2s ease;
+  padding: 0;
+  transition: all 0.3s ease;
 }
 
 .clear-period-btn:hover {
   background: #e2e8f0;
-  color: #475569;
+  color: #ef4444;
 }
 
 .filter-count {
   color: #0369a1;
   font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.custom-range-display {
-  margin-top: 8px;
+  font-weight: 700;
   padding: 6px 12px;
   background: white;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-.date-range {
-  color: #475569;
-  font-size: 0.85rem;
-  font-weight: 500;
+  border-radius: 10px;
+  border: 1px solid #bae6fd;
 }
 
 /* Bookings Container */
 .bookings-container {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  margin-top: 24px;
 }
 
 .section-header {
@@ -2512,82 +1751,454 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .section-header h2 {
   color: #1e293b;
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
+  margin: 0;
 }
 
 .view-controls {
   display: flex;
   gap: 8px;
-  background: #f1f5f9;
-  padding: 4px;
-  border-radius: 12px;
+  align-items: center;
 }
 
 .view-btn {
   padding: 8px 16px;
-  border: none;
-  background: transparent;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
+  background: white;
   color: #64748b;
-  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.view-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
 .view-btn.active {
-  background: white;
-  color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
 }
 
-/* Bookings Table */
-.bookings-table {
-  border-radius: 12px;
+/* PROFESSIONAL BOOKING CARDS */
+.professional-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.professional-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+}
+
+.professional-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  border-color: #3b82f6;
+}
+
+.professional-card.today-card {
+  border-left: 4px solid #10b981;
+}
+
+.professional-card.admin-card {
+  border-left: 4px solid #8b5cf6;
+}
+
+.professional-card.completed-card {
+  border-left: 4px solid #6b7280;
+}
+
+/* Card Header */
+.card-header-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.customer-avatar-section {
+  position: relative;
+}
+
+.avatar-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.customer-type-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.customer-type-indicator.admin {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.customer-type-indicator.client {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.customer-info-section {
+  flex: 1;
+}
+
+.customer-name {
+  color: #1f2937;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+}
+
+.customer-meta {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customer-meta i {
+  width: 16px;
+  margin-right: 6px;
+  color: #9ca3af;
+}
+
+.booking-status-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.status-badge.confirmed {
+  background: linear-gradient(135deg, #dbeafe, #93c5fd);
+  color: #1e40af;
+}
+
+.status-badge.completed {
+  background: linear-gradient(135deg, #f3f4f6, #d1d5db);
+  color: #374151;
+}
+
+.status-badge.pending {
+  background: linear-gradient(135deg, #fef3c7, #fcd34d);
+  color: #92400e;
+}
+
+.status-badge.cancelled {
+  background: linear-gradient(135deg, #fee2e2, #fca5a5);
+  color: #dc2626;
+}
+
+.booking-id {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Service Details */
+.service-details-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 14px;
+  border: 1px solid #f3f4f6;
+}
+
+.service-icon-circle {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.service-info {
+  flex: 1;
+}
+
+.service-name {
+  color: #1f2937;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+}
+
+.service-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.service-category {
+  background: white;
+  color: #6b7280;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+}
+
+.service-duration {
+  color: #d97706;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.service-amount {
+  text-align: right;
+}
+
+.amount-label {
+  display: block;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.amount-value {
+  display: block;
+  color: #059669;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+/* Date & Time Section */
+.datetime-section {
+  margin-bottom: 20px;
+}
+
+.date-time-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+}
+
+.date-section, .time-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-icon, .time-icon {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.date-content, .time-content {
+  flex: 1;
+}
+
+.date-label, .time-label {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.date-value, .time-value {
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Additional Info */
+.additional-info-section {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #f3f4f6;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.info-item i {
+  color: #9ca3af;
+}
+
+/* Action Buttons */
+.action-buttons-section {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.mark-complete-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.mark-complete-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.view-details-btn {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.view-details-btn:hover {
+  background: #e5e7eb;
+  transform: translateY(-2px);
+}
+
+.contact-btn {
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+}
+
+.contact-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Bookings List View */
+.bookings-list {
+  margin-bottom: 30px;
+}
+
+.bookings-table {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+  background: white;
 }
 
 .table-header {
   display: grid;
   grid-template-columns: 1.5fr 1.2fr 1.2fr 0.8fr 1fr 0.8fr 1fr;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   padding: 16px 20px;
-  font-weight: 600;
+  font-weight: 700;
   color: #475569;
-  font-size: 0.9rem;
-  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e5e7eb;
 }
 
 .table-row {
   display: grid;
   grid-template-columns: 1.5fr 1.2fr 1.2fr 0.8fr 1fr 0.8fr 1fr;
   padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  transition: background-color 0.2s ease;
-  position: relative;
-}
-
-.table-row:last-child {
-  border-bottom: none;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.3s ease;
 }
 
 .table-row:hover {
-  background: #f8fafc;
-}
-
-.table-row.highlight-new {
-  background: #f0f9ff;
-  border-left: 4px solid #0ea5e9;
-}
-
-.table-row.urgent {
-  background: #fef3c7;
-  border-left: 4px solid #d97706;
+  background: #f9fafb;
 }
 
 .table-cell {
@@ -2596,598 +2207,178 @@ export default {
   padding: 4px 0;
 }
 
-/* Customer Cell */
 .customer-cell {
-  display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 .customer-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 10px;
   background: linear-gradient(135deg, #3b82f6, #1e40af);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.9rem;
+  margin-right: 12px;
   flex-shrink: 0;
 }
 
-.customer-avatar.admin-avatar {
-  background: linear-gradient(135deg, #6b7280, #4b5563);
-}
-
 .customer-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex: 1;
 }
 
 .customer-main {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
 }
 
-.customer-main strong {
-  color: #1e293b;
-  font-size: 0.95rem;
+.type-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.customer-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.type-badge.admin {
+  background: #ede9fe;
+  color: #7c3aed;
 }
 
-.customer-email, .customer-phone {
-  color: #6b7280;
-  font-size: 0.8rem;
+.type-badge.client {
+  background: #d1fae5;
+  color: #059669;
 }
 
 .customer-email {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  color: #6b7280;
+  font-size: 0.85rem;
 }
 
-.customer-phone {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.admin-details {
-  padding-top: 2px;
-}
-
-.store-badge {
-  background: #f3f4f6;
-  color: #4b5563;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 500;
-}
-
-/* Service Cell */
 .service-cell {
-  display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
 }
 
 .service-cell strong {
-  color: #1e293b;
-  font-size: 0.95rem;
+  margin-bottom: 4px;
 }
 
 .service-category {
   background: #f3f4f6;
   color: #6b7280;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 0.75rem;
-  width: fit-content;
-}
-
-/* Date Time Cell */
-.datetime-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .datetime-container {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .date-section, .time-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 0.9rem;
 }
 
 .date-section i, .time-section i {
-  color: #64748b;
-  font-size: 0.9rem;
-  width: 16px;
-  text-align: center;
-}
-
-.date-section .date {
-  color: #1e293b;
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.time-section .time {
-  color: #64748b;
-  font-size: 0.85rem;
-}
-
-/* Duration Cell */
-.duration-cell .duration-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.duration-container i {
-  color: #d97706;
-  font-size: 0.9rem;
-}
-
-/* Amount Cell */
-.amount-cell .amount-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.amount-container i {
-  color: #059669;
-  font-size: 0.9rem;
-}
-
-/* Action Buttons */
-.actions-cell {
-  position: relative;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 4px;
-}
-
-.btn-action {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.8rem;
-}
-
-.btn-action.confirm {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
-.btn-action.confirm:hover {
-  background: #bbf7d0;
-}
-
-.btn-action.complete {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.btn-action.complete:hover {
-  background: #bfdbfe;
-}
-
-.btn-action.view {
-  background: #f1f5f9;
-  color: #64748b;
-}
-
-.btn-action.view:hover {
-  background: #e2e8f0;
-}
-
-/* ====== AMAZING BOOKING DETAILS GRID ====== */
-.booking-details-grid {
-  background: #f8fafc;
-  border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.details-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.details-header i {
-  color: #3b82f6;
-  font-size: 1rem;
-}
-
-.details-header span {
-  color: #1e293b;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.details-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.detail-row {
-  display: flex;
-  gap: 12px;
-}
-
-.detail-row.combined {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.detail-row.full-width {
-  display: block;
-}
-
-.detail-item {
-  flex: 1;
-  background: white;
-  border-radius: 10px;
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e5e7eb;
-  transition: all 0.2s ease;
-}
-
-.detail-item:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-  transform: translateY(-1px);
-}
-
-.detail-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #475569;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.detail-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  color: #6b7280;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.detail-value {
-  color: #1e293b;
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.detail-value.amount {
-  color: #059669;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.timestamp-item {
-  background: linear-gradient(to right, #f0f9ff, #f8fafc);
-  border-color: #bae6fd;
-}
-
-.timestamp-item .detail-icon {
-  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-  color: white;
-}
-
-.timestamp-item .detail-label {
-  color: #0369a1;
-}
-
-.timestamp-item .detail-value {
-  color: #0c4a6e;
-  font-weight: 500;
-}
-
-/* AMAZING BOOKINGS GRID */
-.bookings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 24px;
-}
-
-.booking-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 24px;
-  transition: all 0.3s ease;
-  position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
-}
-
-.booking-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-}
-
-.booking-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.booking-card:hover::before {
-  opacity: 1;
-}
-
-.booking-card.new-booking {
-  border-left: 4px solid #0ea5e9;
-  background: linear-gradient(to right, #f0f9ff, white);
-}
-
-.booking-card.urgent-booking {
-  border-left: 4px solid #d97706;
-  background: linear-gradient(to right, #fef3c7, white);
-}
-
-.booking-card.admin-booking {
-  border-left: 4px solid #6b7280;
-  background: linear-gradient(to right, #f9fafb, white);
-}
-
-/* Card Header */
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.customer-avatar.large {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #3b82f6, #1e40af);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-}
-
-.customer-avatar.large.admin-avatar {
-  background: linear-gradient(135deg, #6b7280, #4b5563);
-  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2);
-}
-
-.customer-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.customer-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.customer-main h4 {
-  color: #1e293b;
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.customer-badges {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.customer-contact {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.contact-item {
-  color: #6b7280;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.contact-item i {
   width: 16px;
   color: #9ca3af;
 }
 
-.admin-contact {
-  padding-top: 4px;
-}
-
-/* Service Section */
-.service-section {
+.duration-container, .amount-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: #f8fafc;
-  border-radius: 12px;
-  margin-bottom: 20px;
+  gap: 8px;
 }
 
-.service-icon {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+.duration-container i, .amount-container i {
+  color: #9ca3af;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-action {
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.service-details h5 {
-  color: #1e293b;
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 4px 0;
-}
-
-.service-details .service-category {
-  background: white;
-  color: #6b7280;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  display: inline-block;
-}
-
-/* Action Buttons */
-.card-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.action-btn {
-  flex: 1;
-  padding: 10px 16px;
   border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
 }
 
-.confirm-btn {
-  background: linear-gradient(135deg, #10b981, #34d399);
-  color: white;
+.btn-action.complete {
+  background: #d1fae5;
+  color: #059669;
 }
 
-.confirm-btn:hover {
-  background: linear-gradient(135deg, #059669, #10b981);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+.btn-action.complete:hover {
+  background: #a7f3d0;
+  transform: translateY(-2px);
 }
 
-.complete-btn {
-  background: linear-gradient(135deg, #3b82f6, #60a5fa);
-  color: white;
+.btn-action.view {
+  background: #e0f2fe;
+  color: #0284c7;
 }
 
-.complete-btn:hover {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+.btn-action.view:hover {
+  background: #bae6fd;
+  transform: translateY(-2px);
 }
 
-.view-btn {
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+.btn-action.contact {
+  background: #f3e8ff;
+  color: #7c3aed;
 }
 
-.view-btn:hover {
-  background: #e5e7eb;
-  color: #374151;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.btn-action.contact:hover {
+  background: #ddd6fe;
+  transform: translateY(-2px);
 }
 
 /* Pagination */
 .pagination {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #e2e8f0;
+  gap: 16px;
+  margin-top: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .pagination-btn {
-  padding: 10px 16px;
-  border: 1px solid #e2e8f0;
-  background: white;
+  padding: 8px 16px;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
+  background: white;
+  color: #64748b;
+  font-weight: 600;
   cursor: pointer;
-  color: #475569;
-  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
+  gap: 6px;
+  transition: all 0.3s ease;
 }
 
 .pagination-btn:hover:not(:disabled) {
@@ -3206,20 +2397,19 @@ export default {
 }
 
 .page-btn {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #e2e8f0;
-  background: white;
+  width: 36px;
+  height: 36px;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
+  background: white;
+  color: #64748b;
+  font-weight: 600;
   cursor: pointer;
-  color: #475569;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .page-btn:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
+  border-color: #cbd5e1;
 }
 
 .page-btn.active {
@@ -3228,7 +2418,22 @@ export default {
   color: white;
 }
 
-/* MODAL STYLES */
+/* No Results */
+.no-results {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.no-results i {
+  font-size: 3rem;
+  color: #9ca3af;
+  margin-bottom: 16px;
+}
+
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -3240,256 +2445,96 @@ export default {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
   background: white;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
+/* Add this to your existing CSS */
+.loading-indicator {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-left: 10px;
+  font-weight: normal;
 }
 
+.customer-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.customer-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 2px solid #f3f4f6;
 }
 
 .modal-header h3 {
-  color: #1e293b;
-  font-size: 1.3rem;
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.modal-header i {
-  color: #3b82f6;
+  color: #1e293b;
 }
 
 .modal-close {
-  background: #f3f4f6;
-  border: none;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 10px;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .modal-close:hover {
   background: #e5e7eb;
-  color: #374151;
 }
 
 .modal-body {
   padding: 24px;
 }
 
-.booking-overview {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  background: #f9fafb;
-  border-radius: 12px;
-  margin-bottom: 24px;
-}
-
-.overview-avatar {
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #3b82f6, #1e40af);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-
-.overview-avatar.admin-avatar {
-  background: linear-gradient(135deg, #6b7280, #4b5563);
-}
-
-.overview-info {
-  flex: 1;
-}
-
-.overview-info h4 {
+.booking-details h4 {
   color: #1e293b;
-  font-size: 1.3rem;
-  margin: 0 0 8px 0;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f3f4f6;
 }
 
-.overview-badges {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+.booking-details p {
+  color: #4b5563;
+  margin: 8px 0;
 }
 
-.overview-meta {
-  display: flex;
-  gap: 8px;
-  color: #6b7280;
-  font-size: 0.85rem;
-}
-
-.overview-amount {
-  text-align: right;
-}
-
-.amount-label {
-  display: block;
-  color: #6b7280;
-  font-size: 0.85rem;
-  margin-bottom: 4px;
-}
-
-.amount-value {
-  display: block;
-  color: #059669;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.details-section {
-  margin-bottom: 24px;
-}
-
-.details-section h5 {
-  color: #1e293b;
-  font-size: 1.1rem;
-  margin: 0 0 16px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.details-section h5 i {
-  color: #3b82f6;
-}
-
-.details-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 12px;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  color: #6b7280;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.detail-value {
-  color: #1e293b;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.admin-value {
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.code {
-  font-family: monospace;
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-}
-
-.payment-status {
+.booking-details strong {
+  color: #1f2937;
   font-weight: 600;
 }
 
-.payment-status.paid {
-  color: #16a34a;
-}
-
-.payment-status.pending {
-  color: #d97706;
-}
-
-.payment-status.failed {
-  color: #dc2626;
-}
-
-.notes-content {
-  background: #fefce8;
-  border: 1px solid #fef3c7;
-  border-radius: 8px;
-  padding: 16px;
-  color: #92400e;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.debug-section {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.debug-section h5 {
-  background: #f3f4f6;
-  padding: 12px 16px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.debug-section pre {
-  margin: 0;
-  padding: 16px;
-  background: #1f2937;
-  color: #e5e7eb;
-  font-size: 0.8rem;
-  overflow-x: auto;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.modal-footer {
+.modal-actions {
+  margin-top: 24px;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 24px;
-  border-top: 1px solid #e5e7eb;
 }
 
 /* Animations */
@@ -3498,127 +2543,57 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* ====== RESPONSIVE DESIGN ====== */
-@media (max-width: 768px) {
-  .bookings-section {
-    padding: 16px;
+.professional-card {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .professional-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   }
-  
-  .header-content {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
+}
+
+@media (max-width: 768px) {
+  .professional-cards-grid {
+    grid-template-columns: 1fr;
   }
   
   .stats-overview {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .filters-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .search-box {
-    min-width: auto;
-  }
-  
-  .filter-controls {
-    justify-content: center;
-  }
-  
-  .timeline-filter-buttons {
-    justify-content: center;
-  }
-  
-  .timeline-active-filter {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-  
-  .table-header,
-  .table-row {
+  .date-time-card {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 12px;
+  }
+  
+  .action-buttons-section {
+    flex-direction: column;
+  }
+  
+  .table-header, .table-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   
   .table-cell {
-    justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f3f4f6;
   }
   
   .table-cell:last-child {
     border-bottom: none;
-  }
-  
-  .table-cell::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: #475569;
-    font-size: 0.9rem;
-  }
-  
-  .bookings-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .pagination {
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .detail-row.combined {
-    grid-template-columns: 1fr;
-  }
-  
-  .booking-details-grid {
-    padding: 16px;
-  }
-  
-  .detail-item {
-    padding: 12px;
-  }
-  
-  .datetime-container {
-    gap: 4px;
-  }
-  
-  .date-section, .time-section {
-    gap: 6px;
-  }
-  
-  .card-actions {
-    flex-direction: column;
-  }
-  
-  .modal-content {
-    max-width: 100%;
-    margin: 0;
-  }
-  
-  .booking-overview {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .overview-amount {
-    text-align: center;
-    width: 100%;
-  }
-  
-  .modal-footer {
-    flex-direction: column;
-  }
-  
-  .modal-footer .btn {
-    width: 100%;
-    justify-content: center;
   }
 }
 
@@ -3627,69 +2602,29 @@ export default {
     grid-template-columns: 1fr;
   }
   
-  .title-section .title {
-    font-size: 1.8rem;
-  }
-  
-  .header-actions {
-    flex-direction: column;
-    width: 100%;
-  }
-  
-  .header-actions .btn {
-    width: 100%;
-    justify-content: center;
-  }
-  
-  .customer-main {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .customer-badges {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  
-  .view-controls {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  
-  .timeline-filter-buttons {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .timeline-filter-btn {
-    font-size: 0.85rem;
-    padding: 10px 12px;
-  }
-  
-  .date-inputs {
+  .filters-row {
     flex-direction: column;
   }
   
-  .date-input-group {
+  .search-box {
     min-width: 100%;
   }
   
-  .details-header {
+  .card-header-section {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: stretch;
+    gap: 12px;
   }
   
-  .detail-item {
-    flex-direction: column;
-    text-align: center;
-    gap: 8px;
+  .booking-status-section {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
   
-  .detail-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 0.8rem;
+  .pagination {
+    flex-direction: column;
+    gap: 10px;
   }
 }
 </style>

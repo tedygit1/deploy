@@ -16,6 +16,7 @@
             v-model="local.categoryId" 
             @change="onCategoryChange"
             :class="{ 'error': !local.categoryId && showError }"
+            @click="loadCategoriesIfNeeded"
           >
             <option disabled value="">Choose a category</option>
             <option v-for="cat in categories" :key="cat._id" :value="cat._id">
@@ -243,7 +244,14 @@
 import http from "@/api/index.js";
 
 export default {
-  props: { service: { type: Object, default: null } },
+  props: { 
+    service: { type: Object, default: null },
+    // Optional: pass categories from parent to avoid API call
+    initialCategories: { 
+      type: Array, 
+      default: () => [] 
+    }
+  },
 
   data() {
     return {
@@ -268,7 +276,9 @@ export default {
       showError: false,
       isSaving: false,
       showSubcategoryDropdown: false,
-      subcategorySearch: ""
+      subcategorySearch: "",
+      categoriesLoaded: false,  // New flag to track if categories are loaded
+      shouldLoadCategories: false  // New flag to control when to load
     };
   },
 
@@ -328,11 +338,34 @@ export default {
           this.updateBookingPrice();
         }
       }
+    },
+    
+    // Use initialCategories from parent if provided
+    initialCategories: {
+      immediate: true,
+      handler(cats) {
+        if (cats && cats.length > 0 && !this.categoriesLoaded) {
+          this.categories = [...cats];
+          this.categoriesLoaded = true;
+        }
+      }
     }
   },
 
-  async mounted() {
-    await this.fetchData();
+  mounted() {
+    console.log('🔍 ServiceForm mounted - checking if we need categories...');
+    
+    // Only load categories if we're in a provider context
+    const isProviderRoute = window.location.pathname.includes('/provider');
+    const hasToken = localStorage.getItem("provider_token") || localStorage.getItem("token");
+    
+    if (isProviderRoute && hasToken) {
+      this.shouldLoadCategories = true;
+      console.log('✅ ServiceForm: Provider route detected, will load categories when needed');
+    } else {
+      console.log('⚠️ ServiceForm: Not in provider route or no token, skipping category load');
+    }
+    
     this.$nextTick(() => {
       if (this.$refs.titleInput) {
         this.$refs.titleInput.focus();
@@ -351,13 +384,41 @@ export default {
       this.local.bookingPrice = Math.round(this.local.totalPrice * 0.1);
     },
 
+    async loadCategoriesIfNeeded() {
+      // Don't load if already loaded or not needed
+      if (this.categoriesLoaded || this.categories.length > 0) {
+        return;
+      }
+      
+      // Only load if we're supposed to (provider context)
+      if (!this.shouldLoadCategories) {
+        console.log('⚠️ Skipping category load - not in provider context');
+        return;
+      }
+      
+      // Check if user is authenticated
+      const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+      if (!token) {
+        console.log('⚠️ Skipping category load - no auth token');
+        return;
+      }
+      
+      await this.fetchData();
+    },
+
     async fetchData() {
       try {
+        console.log('📤 Loading categories for ServiceForm...');
         const res = await http.get("/categories");
         this.categories = res.data;
+        this.categoriesLoaded = true;
+        console.log('✅ Categories loaded:', this.categories.length);
       } catch (err) {
         console.error("Failed to load categories:", err);
-        alert("❌ Failed to load categories. Please try again.");
+        // Don't show alert on home page
+        if (window.location.pathname.includes('/provider')) {
+          alert("❌ Failed to load categories. Please try again.");
+        }
       }
     },
 
@@ -365,6 +426,16 @@ export default {
       this.subcategories = [];
       this.local.subcategoryIds = [];
       if (!categoryId) return;
+      
+      // Don't fetch subcategories if not in provider context
+      const isProviderRoute = window.location.pathname.includes('/provider');
+      const hasToken = localStorage.getItem("provider_token") || localStorage.getItem("token");
+      
+      if (!isProviderRoute || !hasToken) {
+        console.log('⚠️ Skipping subcategory fetch - not in provider context');
+        return;
+      }
+      
       try {
         const res = await http.get(`/categories/${categoryId}/subcategories`);
         this.subcategories = Array.isArray(res.data) ? res.data : [];

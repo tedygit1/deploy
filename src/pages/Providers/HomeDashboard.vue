@@ -264,8 +264,8 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, computed, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import http from "@/api/index.js";
 
 export default {
@@ -279,12 +279,13 @@ export default {
 
   setup(props) {
     const router = useRouter();
+    const route = useRoute();
     
-    // Reactive data
-    const loading = ref(true);
+    // Reactive data - CHANGED: Start with false, not true!
+    const loading = ref(false);
     const criticalError = ref("");
     const hasData = ref(false);
-    const isRealData = ref(false); // ADDED BACK - Fixes the error
+    const isRealData = ref(false);
     const currentProviderPid = ref("");
     
     // Data storage
@@ -307,6 +308,37 @@ export default {
     // Debug info
     const lastServicesEndpoint = ref("");
     const lastBookingsEndpoint = ref("");
+
+    // ========== NEW: Check if we should load data ==========
+    const shouldLoadData = () => {
+      console.log('🔍 Checking if should load data:');
+      
+      // 1. Check if we have a provider prop
+      if (!props.provider || !props.provider.pid) {
+        console.warn('⚠️ No provider data available');
+        return false;
+      }
+      
+      // 2. Check if user is logged in
+      const token = localStorage.getItem("provider_token");
+      if (!token) {
+        console.warn('⚠️ No authentication token');
+        return false;
+      }
+      
+      // 3. Check if we're on the provider home route
+      const isProviderHome = route.path.includes('/provider/home') || 
+                            route.name === 'ProviderHome';
+      
+      if (!isProviderHome) {
+        console.warn('⚠️ Not on provider home route');
+        return false;
+      }
+      
+      console.log('✅ Conditions met - should load data');
+      return true;
+    };
+    // ========== END NEW ==========
 
     // Get Provider PID
     const getProviderPid = () => {
@@ -563,10 +595,21 @@ export default {
       return stats;
     };
 
-    // Load all data
+    // Load all data - UPDATED: Add check at beginning
     const loadDashboardData = async () => {
+      // ========== NEW: Check if we should load data ==========
+      if (!shouldLoadData()) {
+        console.log('⏸️ Skipping dashboard data load - not authenticated or not on provider home');
+        loading.value = false;
+        return;
+      }
+      // ========== END NEW ==========
+
       const providerPid = getProviderPid();
-      if (!providerPid) return;
+      if (!providerPid) {
+        loading.value = false;
+        return;
+      }
 
       loading.value = true;
       criticalError.value = "";
@@ -733,17 +776,39 @@ export default {
       return parseFloat(amount).toFixed(2);
     };
 
-    // Lifecycle
+    // ========== UPDATED: Lifecycle - Only load when appropriate ==========
     onMounted(() => {
-      loadDashboardData();
+      console.log('🏠 HomeDashboard mounted');
+      console.log('👤 Provider prop:', props.provider);
+      console.log('📍 Current route:', route.path);
+      console.log('🔑 Has token?', !!localStorage.getItem('provider_token'));
+      
+      // Wait a bit to ensure props are available, then check if we should load
+      setTimeout(() => {
+        if (shouldLoadData()) {
+          loadDashboardData();
+        } else {
+          console.log('ℹ️ Not loading data - waiting for authentication or wrong route');
+          loading.value = false; // Make sure loading is false
+        }
+      }, 100);
     });
+
+    // ========== NEW: Watch for provider prop changes ==========
+    watch(() => props.provider, (newProvider) => {
+      if (newProvider && newProvider.pid && shouldLoadData()) {
+        console.log('👤 Provider data received, loading dashboard...');
+        loadDashboardData();
+      }
+    }, { immediate: true });
+    // ========== END NEW ==========
 
     return {
       // State
       loading,
       criticalError,
       hasData,
-      isRealData, // ADDED BACK to return statement
+      isRealData,
       currentProviderPid,
       currentDate,
       lastUpdated,

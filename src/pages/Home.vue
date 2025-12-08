@@ -1,28 +1,6 @@
 <!-- src/pages/Home.vue -->
 <template>
   <div class="home font-poppins">
-    <!-- Navigation Bar -->
-    <nav class="navbar">
-      <div class="container">
-        <div class="nav-content">
-          <div class="nav-logo">
-            <span class="logo-icon">∞</span>
-            <span class="logo-text">Infinity-Booking</span>
-          </div>
-          <div class="nav-links">
-            <a href="#features" class="nav-link">Features</a>
-            <a href="#industries" class="nav-link">Industries</a>
-            <a href="#pricing" class="nav-link">Pricing</a>
-            <a href="#success-stories" class="nav-link">Success Stories</a>
-          </div>
-          <div class="nav-actions">
-            <router-link to="/login" class="nav-login">Login</router-link>
-            <router-link to="/register" class="nav-register">Get Started</router-link>
-          </div>
-        </div>
-      </div>
-    </nav>
-
     <!-- Enhanced Hero Section -->
     <section id="hero" class="hero">
       <div class="hero-overlay"></div>
@@ -42,10 +20,10 @@
             </p>
 
             <div class="hero-buttons">
-              <router-link to="/register" class="btn-primary">
+              <button @click="goToRegister" class="btn-primary">
                 <span class="btn-icon">🚀</span>
                 Start Free Trial
-              </router-link>
+              </button>
               <a href="#features" class="btn-secondary">
                 <span class="btn-icon">📹</span>
                 Watch Demo (3 min)
@@ -293,9 +271,9 @@
               <li>❌ Advanced reports</li>
               <li>❌ Payment processing</li>
             </ul>
-            <router-link to="/register" class="plan-button">
+            <button @click="goToRegister" class="plan-button">
               Start Free
-            </router-link>
+            </button>
           </div>
           
           <div class="pricing-card featured">
@@ -312,9 +290,9 @@
               <li>✅ Business insights</li>
               <li>✅ Payment processing</li>
             </ul>
-            <router-link to="/register" class="plan-button primary">
+            <button @click="goToRegister" class="plan-button primary">
               Start 14-Day Trial
-            </router-link>
+            </button>
           </div>
         </div>
       </div>
@@ -420,9 +398,9 @@
           </div>
 
           <div class="cta-actions">
-            <router-link to="/register" class="cta-btn primary">
+            <button @click="goToRegister" class="cta-btn primary">
               Start Free Trial - No Credit Card Needed
-            </router-link>
+            </button>
             <a href="/demo" class="cta-btn secondary">
               📞 Book a Demo Call
             </a>
@@ -448,6 +426,20 @@
   </div>
 </template>
 
+<script>
+export default {
+  name: 'HomePage',
+  methods: {
+    goToLogin() {
+      this.$router.push('/login');
+    },
+    goToRegister() {
+      this.$router.push('/register');
+    }
+  }
+}
+</script>
+
 <style scoped>
 /* ===== BASE STYLES ===== */
 .home {
@@ -464,105 +456,12 @@
   padding: 0 16px;
 }
 
-/* ===== NAVIGATION ===== */
-.navbar {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e5e7eb;
-  position: fixed;
-  top: 0;
-  width: 100%;
-  z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-}
-
-.nav-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.nav-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: #1a1a1a;
-}
-
-.logo-icon {
-  background: linear-gradient(135deg, #3c3f50, #2b193d);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.nav-links {
-  display: flex;
-  gap: 24px;
-}
-
-.nav-link {
-  color: #4b5563;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.9rem;
-  transition: color 0.2s;
-}
-
-.nav-link:hover {
-  color: #667eea;
-}
-
-.nav-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.nav-login {
-  color: #4b5563;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.9rem;
-  padding: 8px 16px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.nav-login:hover {
-  color: #667eea;
-  background: #f8fafc;
-}
-
-.nav-register {
-  background: #667eea;
-  color: white;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9rem;
-  padding: 8px 16px;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.nav-register:hover {
-  background: #5a6fd8;
-  transform: translateY(-1px);
-}
-
 /* ===== HERO SECTION ===== */
 .hero {
   background: linear-gradient(135deg, #555572 0%, #58525e 100%);
   color: white;
   padding: 140px 0 80px;
-  margin-top: 60px;
+  margin-top: 60px; /* Account for fixed navbar height */
   position: relative;
 }
 
@@ -599,7 +498,6 @@
   height: 6px;
   background: #10b981;
   border-radius: 50%;
-  animation: pulse 2s infinite;
 }
 
 .hero-title {
@@ -643,6 +541,9 @@
   font-size: 1rem;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
 }
 
 .btn-primary {
@@ -1165,13 +1066,15 @@
   text-align: center;
   padding: 14px 24px;
   border-radius: 10px;
-  text-decoration: none;
   font-weight: 600;
   font-size: 1rem;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 2px solid #e5e7eb;
   background: white;
   color: #4b5563;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
 }
 
 .plan-button.primary {
@@ -1414,6 +1317,9 @@
   gap: 10px;
   min-height: 56px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
 }
 
 .cta-btn.primary {
@@ -1481,20 +1387,16 @@
   .section-title {
     font-size: 2rem;
   }
+  
+  .hero {
+    margin-top: 70px; /* Adjust for mobile navbar height */
+  }
 }
 
 @media (max-width: 768px) {
-  .nav-links {
-    display: none;
-  }
-  
-  .navbar {
-    padding: 0 16px;
-  }
-  
   .hero {
     padding: 120px 0 70px;
-    margin-top: 56px;
+    margin-top: 60px;
   }
   
   .hero-title {
@@ -1587,15 +1489,6 @@
     font-size: 1rem;
   }
   
-  .nav-actions {
-    gap: 8px;
-  }
-  
-  .nav-login, .nav-register {
-    padding: 8px 14px;
-    font-size: 0.85rem;
-  }
-  
   .story-author {
     flex-direction: column;
     text-align: center;
@@ -1637,19 +1530,5 @@
   .step {
     max-width: 100%;
   }
-}
-
-/* Performance: Remove animations on low-end devices */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 </style>

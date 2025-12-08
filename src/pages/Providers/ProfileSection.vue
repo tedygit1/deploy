@@ -1,4 +1,4 @@
-<!-- src/pages/Providers/ProfileSection.vue -->
+<!-- src/pages/Providers/ProfileSection.vue - FULLY RESPONSIVE -->
 <template>
   <div class="profile-section">
     <!-- Enhanced Header with Visual Effects -->
@@ -430,7 +430,7 @@ export default {
 /* Enhanced Header */
 .profile-header {
   background: linear-gradient(135deg, #4e5368 0%, #7c86e5 100%);
-  padding: 12px 32px 32px;
+  padding: 24px 32px;
   position: relative;
   overflow: hidden;
 }
@@ -446,14 +446,16 @@ export default {
 
 .header-content {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 20px;
   position: relative;
   z-index: 2;
 }
 
 .header-text .title-gradient {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   font-weight: 800;
   margin-bottom: 8px;
   background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
@@ -471,9 +473,12 @@ export default {
 
 .header-right {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 16px;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 100%;
 }
 
 .status-display {
@@ -485,6 +490,7 @@ export default {
   border-radius: 12px;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(15, 247, 66, 0.2);
+  white-space: nowrap;
 }
 
 .status-label {
@@ -524,6 +530,7 @@ export default {
   gap: 8px;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  min-width: 140px;
 }
 
 .edit-btn:hover,
@@ -537,15 +544,15 @@ export default {
 /* Main Content Layout */
 .profile-content {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: minmax(280px, 320px) 1fr;
   gap: 0;
-  min-height: 600px;
+  min-height: 500px;
 }
 
 /* Profile Picture Section */
 .profile-picture-section {
   background: #4c5055;
-  padding: 32px;
+  padding: 24px 20px;
   border-right: 1px solid #e2e8f0;
 }
 
@@ -574,7 +581,7 @@ export default {
 }
 
 .picture-content {
-  padding: 24px;
+  padding: 20px;
   text-align: center;
 }
 
@@ -586,8 +593,8 @@ export default {
 }
 
 .profile-picture {
-  width: 200px;
-  height: 200px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   overflow: hidden;
   border: 4px solid #e2e8f0;
@@ -616,7 +623,7 @@ export default {
 }
 
 .placeholder {
-  font-size: 4rem;
+  font-size: 3.5rem;
   color: #cbd5e1;
 }
 
@@ -639,8 +646,8 @@ export default {
 }
 
 .edit-overlay i {
-  font-size: 1.5rem;
-  margin-bottom: 8px;
+  font-size: 1.3rem;
+  margin-bottom: 6px;
 }
 
 .profile-picture input[type="file"] {
@@ -675,23 +682,23 @@ export default {
 
 .photo-tips p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #0369a1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Profile Information Section */
 .profile-info-section {
-  padding: 10px;
+  padding: 24px 20px;
   background-color: #a9b3c2;
 }
 
 .info-card {
   background: rgb(252, 252, 253);
-  border-radius: 60px;
+  border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(99, 109, 136, 0.06);
   border: 1px solid #65717c;
@@ -699,16 +706,18 @@ export default {
 
 .info-card .card-header {
   background: linear-gradient(135deg, #2b3741, #b2b9c1);
-  padding: 24px;
+  padding: 20px;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .info-card .card-header h3 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: #fafcff;
   display: flex;
@@ -717,14 +726,14 @@ export default {
 }
 
 .card-body {
-  padding: 32px;
+  padding: 24px;
 }
 
 /* Form Styles */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .form-group {
@@ -743,13 +752,13 @@ export default {
   font-weight: 600;
   color: #5786d0;
   margin-bottom: 8px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .form-label i {
   color: #6b7280;
   width: 16px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .required {
@@ -758,13 +767,15 @@ export default {
 
 .form-input,
 .form-textarea {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   font-size: 0.95rem;
   transition: all 0.3s ease;
   background: #26209d;
   font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-input:focus,
@@ -797,7 +808,7 @@ export default {
 
 .field-note {
   color: #294782;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   margin-top: 6px;
   font-style: italic;
 }
@@ -812,16 +823,17 @@ export default {
   background: linear-gradient(135deg, #10b981, #34d399);
   color: white;
   border: none;
-  padding: 14px 28px;
+  padding: 12px 24px;
   border-radius: 12px;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  white-space: nowrap;
 }
 
 .save-btn:hover:not(:disabled) {
@@ -840,7 +852,7 @@ export default {
 .categories-display {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   padding: 16px;
   border: 2px dashed #e5e7eb;
   border-radius: 12px;
@@ -851,18 +863,18 @@ export default {
 .category-tag {
   background: linear-gradient(135deg, #3b82f6, #1e40af);
   color: white;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 20px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
 }
 
 .no-categories {
-  padding: 20px;
+  padding: 16px;
   border: 2px dashed #d1d5db;
   border-radius: 12px;
   background: #f9fafb;
@@ -872,6 +884,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-size: 0.9rem;
 }
 
 /* Certificate Display */
@@ -883,10 +896,11 @@ export default {
   background: #f0f9ff;
   border: 1px solid #e0f2fe;
   border-radius: 12px;
+  flex-wrap: wrap;
 }
 
 .certificate-display i.fa-file-pdf {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   color: #ef4444;
 }
 
@@ -894,6 +908,7 @@ export default {
   flex: 1;
   font-weight: 600;
   color: #0369a1;
+  min-width: 120px;
 }
 
 .certificate-link {
@@ -908,6 +923,7 @@ export default {
   align-items: center;
   gap: 6px;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .certificate-link:hover {
@@ -932,12 +948,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 20px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 12px;
   color: white;
   font-weight: 500;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  max-width: 360px;
   pointer-events: all;
   position: relative;
   overflow: hidden;
@@ -957,7 +973,7 @@ export default {
 }
 
 .toast-icon {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   flex-shrink: 0;
 }
 
@@ -966,7 +982,7 @@ export default {
 }
 
 .toast-message {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   line-height: 1.4;
 }
 
@@ -1019,7 +1035,7 @@ export default {
   100% { transform: translateX(100%) scale(0.3); opacity: 0; }
 }
 
-/* Responsive Design */
+/* ===== FULLY RESPONSIVE MOBILE DESIGN ===== */
 @media (max-width: 1024px) {
   .profile-content {
     grid-template-columns: 1fr;
@@ -1029,74 +1045,120 @@ export default {
     border-right: none;
     border-bottom: 1px solid #e2e8f0;
   }
+  
+  .profile-picture {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .header-content {
+    padding: 0 8px;
+  }
 }
 
 @media (max-width: 768px) {
   .profile-header {
-    padding: 32px 24px 24px;
+    padding: 20px;
   }
   
   .header-content {
     flex-direction: column;
-    gap: 20px;
+    align-items: flex-start;
+    gap: 16px;
   }
   
   .header-right {
-    align-items: stretch;
     width: 100%;
-  }
-  
-  .status-display {
     justify-content: space-between;
+    flex-wrap: wrap;
   }
   
   .title-gradient {
-    font-size: 2rem;
+    font-size: 1.8rem;
+  }
+  
+  .profile-picture {
+    width: 140px;
+    height: 140px;
+  }
+  
+  .card-body {
+    padding: 20px;
   }
   
   .form-grid {
     grid-template-columns: 1fr;
   }
   
-  .profile-picture {
-    width: 150px;
-    height: 150px;
+  .edit-btn,
+  .save-btn {
+    width: 100%;
+    justify-content: center;
   }
   
-  .card-body {
-    padding: 24px;
-  }
-}
-
-@media (max-width: 480px) {
-  .profile-section {
-    border-radius: 12px;
-    margin: 8px;
-  }
-  
-  .profile-header {
-    padding: 24px 20px 20px;
-  }
-  
-  .profile-content {
-    min-height: auto;
-  }
-  
-  .profile-picture-section,
-  .profile-info-section {
-    padding: 20px;
-  }
-  
-  .info-card .card-header {
+  .card-header {
     flex-direction: column;
-    gap: 16px;
     align-items: flex-start;
+    gap: 12px;
   }
   
   .card-actions {
     width: 100%;
     display: flex;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-section {
+    margin: 8px;
+    border-radius: 16px;
+  }
+  
+  .profile-header {
+    padding: 16px;
+  }
+  
+  .title-gradient {
+    font-size: 1.6rem;
+  }
+  
+  .subtitle {
+    font-size: 1rem;
+  }
+  
+  .profile-picture {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .placeholder {
+    font-size: 2.8rem;
+  }
+  
+  .form-input,
+  .form-textarea {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+  
+  .form-label {
+    font-size: 0.85rem;
+  }
+  
+  .category-tag {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+  
+  .certificate-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .certificate-link {
+    align-self: flex-end;
   }
 }
 </style>

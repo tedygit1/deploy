@@ -1,6 +1,7 @@
-<!-- src/App.vue -->
+<!-- src/App.vue - FINAL FIXED -->
 <template>
   <div id="app" class="font-poppins">
+    <Navbar />
     <router-view />
     <Toaster 
       position="top-right" 
@@ -13,8 +14,13 @@
 </template>
 
 <script>
+import Navbar from '@/components/Navbar.vue'
+
 export default {
   name: "App",
+  components: {
+    Navbar
+  },
   mounted() {
     // Ensure mobile viewport is respected
     if (!document.querySelector('meta[name="viewport"]')) {
@@ -45,7 +51,7 @@ body {
   background-color: #f8fafc;
   color: #1e293b;
   line-height: 1.6;
-  overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
 }
 
 /* Prevent iOS Safari zoom on input focus */
@@ -53,7 +59,7 @@ input, textarea, select, button {
   font-size: 16px;
 }
 
-/* Font Preload (improves text rendering) */
+/* Font Preload */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 /* Focus visible for accessibility */

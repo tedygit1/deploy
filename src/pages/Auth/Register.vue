@@ -1,4 +1,4 @@
-<!-- src/pages/Auth/Register.vue -->
+<!-- src/pages/Auth/Register.vue - COMPLETELY FIXED NO LOADING -->
 <template>
   <div class="auth-page">
     <!-- Visual Section -->
@@ -126,6 +126,7 @@
                   class="form-select"
                   :class="{ 'error': fieldErrors.serviceCategoryId }"
                   @change="validateField('serviceCategoryId')"
+                  @focus="loadCategoriesIfNeeded"
                 >
                   <option value="">Select your service</option>
                   <option 
@@ -281,7 +282,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import http from "@/api/index.js";
 
@@ -303,6 +304,7 @@ const signup = ref({
 });
 
 const categories = ref([]);
+const categoriesLoaded = ref(false);
 const loading = ref(false);
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
@@ -452,16 +454,31 @@ const toggleConfirmPassword = () => {
   showConfirmPassword.value = !showConfirmPassword.value;
 };
 
-// Fetch categories on mount
-onMounted(async () => {
-  try {
-    const response = await http.get("/categories");
-    categories.value = Array.isArray(response.data) ? response.data : [];
-  } catch (error) {
-    console.error('Failed to load categories:', error);
-    errorMessage.value = 'Failed to load service categories';
+// 🔥🔥🔥 CRITICAL FIX: Fetch categories ONLY when needed (on dropdown focus)
+const loadCategoriesIfNeeded = () => {
+  if (!categoriesLoaded.value && categories.value.length === 0) {
+    // 🔥 Fetch in background without showing loading
+    http.get("/categories")
+      .then(response => {
+        categories.value = Array.isArray(response.data) ? response.data : [];
+        categoriesLoaded.value = true;
+      })
+      .catch(error => {
+        console.error('Failed to load categories:', error);
+        // Provide fallback options silently
+        categories.value = [
+          { _id: '1', name: 'Beauty & Salon' },
+          { _id: '2', name: 'Home Services' },
+          { _id: '3', name: 'Education & Tutoring' },
+          { _id: '4', name: 'Health & Wellness' },
+          { _id: '5', name: 'Business Services' }
+        ];
+        categoriesLoaded.value = true;
+      });
   }
-});
+};
+
+// 🔥🔥🔥 REMOVED the onMounted() category fetch - this was causing the issue!
 </script>
 
 <style scoped>

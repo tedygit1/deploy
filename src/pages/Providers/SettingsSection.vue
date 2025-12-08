@@ -376,6 +376,25 @@ export default {
   setup() {
     const router = useRouter();
 
+    // API Configuration - USING PROXY PATH
+    const getApiBaseUrl = () => {
+      if (import.meta.env.MODE === 'development') {
+        // In development, use relative path through proxy
+        return '';
+      } else {
+        // In production, use the actual backend URL
+        return import.meta.env.VITE_API_BASE_URL || 'https://infinity-booking-backend1.onrender.com';
+      }
+    };
+
+    const API_BASE_URL = getApiBaseUrl();
+    
+    // IMPORTANT: Use /api as defined in your proxy, which will be rewritten to /infinity-booking
+    const LOGOUT_ENDPOINT = `/api/auth/logout`;
+    console.log('Environment:', import.meta.env.MODE);
+    console.log('API Base URL:', API_BASE_URL);
+    console.log('Logout Endpoint:', LOGOUT_ENDPOINT);
+
     // State
     const loggingOut = ref(false);
     const showLogoutModal = ref(false);
@@ -463,7 +482,7 @@ export default {
       return security.value.newPassword === security.value.confirmPassword;
     };
 
-    // Logout functionality
+    // Real logout functionality using proxy
     const confirmLogout = () => {
       showLogoutModal.value = true;
     };
@@ -473,37 +492,125 @@ export default {
       showLogoutModal.value = false;
       
       try {
+        // Get token from localStorage
+        const token = localStorage.getItem("provider_token") || 
+                     localStorage.getItem("userToken") || 
+                     localStorage.getItem("token");
+        
+        if (!token) {
+          console.log("No token found - clearing local data");
+          clearAllAuthData();
+          showToast('Logged out!', 'info');
+          await router.push({ name: "Login" });
+          return;
+        }
+
+        console.log("Calling logout endpoint:", LOGOUT_ENDPOINT);
+        
+        // Use relative path (proxy will handle it)
+        const response = await fetch(LOGOUT_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          console.log("Backend logout successful");
+          showToast('Logged out successfully!', 'success');
+        } else {
+          console.warn("Backend logout failed with status:", response.status);
+          showToast('Logged out locally.', 'info');
+        }
+        
         // Clear all authentication data
-        localStorage.removeItem("provider_token");
-        localStorage.removeItem("provider_id");
-        localStorage.removeItem("loggedProvider");
-        localStorage.removeItem("userToken");
-        localStorage.removeItem("userId");
+        clearAllAuthData();
         
-        // Show success message
-        showToast('Logged out successfully!', 'success');
-        
-        // Small delay before redirect
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Wait a moment for user to see the message
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Redirect to login page
         await router.push({ name: "Login" });
+        
       } catch (error) {
         console.error("Logout error:", error);
-        showToast('Logout failed. Please try again.', 'error');
+        
+        // Fallback: still clear everything and redirect
+        clearAllAuthData();
+        showToast('Logged out locally.', 'info');
+        
+        setTimeout(() => {
+          router.push({ name: "Login" });
+        }, 1000);
       } finally {
         loggingOut.value = false;
       }
     };
 
-    // Save handlers
+    // Helper function to clear all authentication data
+    const clearAllAuthData = () => {
+      console.log("Clearing all authentication data...");
+      
+      // List all possible auth storage keys
+      const authKeys = [
+        "provider_token", "provider_id", "loggedProvider",
+        "userToken", "userId", "token", "refreshToken",
+        "user", "auth_token", "access_token", "session",
+        "admin_token", "customer_token"
+      ];
+      
+      // Clear localStorage
+      authKeys.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      // Clear sessionStorage
+      authKeys.forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+      
+      // Clear auth cookies
+      document.cookie.split(";").forEach(cookie => {
+        const [name] = cookie.trim().split("=");
+        const cookieName = name.toLowerCase();
+        if (cookieName.includes("auth") || 
+            cookieName.includes("token") || 
+            cookieName.includes("session")) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+      });
+      
+      console.log("Authentication data cleared");
+    };
+
+    // Save handlers using proxy paths
     const savePrivacy = async () => {
       savingPrivacy.value = true;
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+        
+        if (!token) {
+          throw new Error("Authentication required");
+        }
+
+        const response = await fetch(`/api/user/privacy`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(privacy.value)
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save privacy settings");
+        }
+
         showToast('Privacy settings saved successfully!', 'success');
       } catch (error) {
+        console.error("Save privacy error:", error);
         showToast('Failed to save privacy settings.', 'error');
       } finally {
         savingPrivacy.value = false;
@@ -513,9 +620,28 @@ export default {
     const saveNotifications = async () => {
       savingNotifications.value = true;
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+        
+        if (!token) {
+          throw new Error("Authentication required");
+        }
+
+        const response = await fetch(`/api/user/notifications`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(notifications.value)
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save notification preferences");
+        }
+
         showToast('Notification preferences updated!', 'success');
       } catch (error) {
+        console.error("Save notifications error:", error);
         showToast('Failed to save notification preferences.', 'error');
       } finally {
         savingNotifications.value = false;
@@ -525,9 +651,28 @@ export default {
     const saveLocalization = async () => {
       savingLocalization.value = true;
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+        
+        if (!token) {
+          throw new Error("Authentication required");
+        }
+
+        const response = await fetch(`/api/user/localization`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(localization.value)
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save preferences");
+        }
+
         showToast('Language and timezone updated!', 'success');
       } catch (error) {
+        console.error("Save localization error:", error);
         showToast('Failed to save preferences.', 'error');
       } finally {
         savingLocalization.value = false;
@@ -554,16 +699,37 @@ export default {
       
       changingPassword.value = true;
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
         
+        if (!token) {
+          throw new Error("Authentication required");
+        }
+
+        const response = await fetch(`/api/auth/change-password`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            newPassword: newPassword,
+            confirmPassword: confirmPassword
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to update password");
+        }
+
         // Clear password fields
         security.value.newPassword = "";
         security.value.confirmPassword = "";
         
         showToast('Password updated successfully!', 'success');
       } catch (error) {
-        showToast('Failed to update password. Please try again.', 'error');
+        console.error("Change password error:", error);
+        showToast(error.message || 'Failed to update password. Please try again.', 'error');
       } finally {
         changingPassword.value = false;
       }
@@ -577,13 +743,8 @@ export default {
 
     const deleteAccount = () => {
       if (confirm("⚠️ This action cannot be undone! All your data will be permanently deleted. Continue?")) {
-        // Clear all local storage
-        localStorage.clear();
-        sessionStorage.clear();
-        
+        clearAllAuthData();
         showToast('Account deleted successfully. Redirecting...', 'info');
-        
-        // Redirect to login page
         setTimeout(() => {
           router.push({ name: "Login" });
         }, 2000);

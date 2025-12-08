@@ -1,4 +1,4 @@
-<!-- src/pages/Providers/Dashboard.vue -->
+<!-- src/pages/Providers/Dashboard.vue - FIXED VERSION -->
 <template>
   <div class="dashboard-container">
     <!-- Mobile Header -->
@@ -212,10 +212,13 @@ export default {
       await router.push({ name: "Login" });
     };
 
-    // Fetch provider data
+    // Fetch provider data - WITH AUTH CHECK
     const fetchProvider = async () => {
       const token = localStorage.getItem("provider_token");
-      if (!token) return router.push({ name: "Login" });
+      if (!token) {
+        console.warn('⚠️ No token found, skipping provider fetch');
+        return router.push({ name: "Login" });
+      }
 
       try {
         const res = await http.get("/users/profile", {
@@ -233,17 +236,52 @@ export default {
       }
     };
 
-    // Watch for route changes
+    // Watch for route changes - only fetch on provider routes
     watch(() => route.name, (newRoute) => {
       console.log('📍 Route changed to:', newRoute);
+      
+      // Only fetch provider if we're on a provider route
+      const isProviderRoute = newRoute?.includes('Provider') || 
+                             route.path.includes('/provider');
+      
+      if (isProviderRoute && localStorage.getItem("provider_token")) {
+        console.log('🔄 Fetching provider data for provider route');
+        fetchProvider();
+      }
     });
 
+    // FIXED: Only fetch provider when actually on a provider route and logged in
     onMounted(() => {
-      fetchProvider();
+      console.log('🔍 Dashboard.vue mounted');
+      console.log('📱 Current route:', route.path);
+      console.log('📱 Route name:', route.name);
+      console.log('🔑 Has token?', !!localStorage.getItem("provider_token"));
+      
+      // ONLY fetch provider if:
+      // 1. We're on a provider route AND
+      // 2. User has a token
+      
+      const isProviderRoute = route.path.includes('/provider') || 
+                             route.name?.includes('Provider');
+      const hasToken = localStorage.getItem("provider_token");
+      
+      if (isProviderRoute && hasToken) {
+        console.log('✅ Fetching provider data (on provider route with token)');
+        fetchProvider();
+      } else if (isProviderRoute && !hasToken) {
+        console.warn('🚫 On provider route but no token, redirecting to login');
+        router.push({ name: "Login" });
+      } else {
+        console.log('ℹ️ Not on provider route, skipping provider fetch');
+        // Don't fetch provider data if we're not on a provider route
+      }
     });
 
     const handleProfileUpdated = () => {
-      fetchProvider();
+      // Only fetch provider if we have a token
+      if (localStorage.getItem("provider_token")) {
+        fetchProvider();
+      }
     };
 
     return {
