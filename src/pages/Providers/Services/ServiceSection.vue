@@ -37,6 +37,16 @@
             <span class="stat-label">Draft</span>
           </div>
         </div>
+        <!-- Reviews Summary -->
+        <div class="status-stat">
+          <div class="stat-icon reviews">
+            <i class="fa-solid fa-star"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-number">{{ reviewsStats.total || 0 }}</span>
+            <span class="stat-label">Reviews</span>
+          </div>
+        </div>
       </div>
       
       <!-- Controls Bar -->
@@ -118,16 +128,11 @@
 
         <!-- Banner -->
         <div class="card-banner">
-          <div class="banner-actions">
-            <button class="btn edit-banner-btn" @click.stop="openBannerEditor(service)">
-              <i class="fa-solid fa-camera"></i>
-              Edit Banner
-            </button>
-          </div>
+          <!-- 🗑️ REMOVED: Add Images button from banner -->
           <div class="banner-gradient"></div>
           <img
-            v-if="service?.banner"
-            :src="service.banner"
+            v-if="getValidBannerUrl(service)"
+            :src="getValidBannerUrl(service)"
             :alt="service?.title || 'Service'"
             class="banner-img"
             @error="handleBannerError(service)"
@@ -173,7 +178,6 @@
             <p class="service-description">
               {{ service?.description || 'No description available' }}
             </p>
-            <!-- 🗑️ REMOVED: Provider Contact Information Section -->
             <div class="service-meta">
               <div class="price">
                 <div class="price-label">Price</div>
@@ -186,6 +190,34 @@
                 <i class="fa-solid fa-wallet"></i> {{ service.paymentMethod }}
               </div>
             </div>
+            
+            <!-- Reviews Section -->
+            <div class="reviews-summary" @click="viewServiceReviews(service)">
+              <div class="reviews-header">
+                <i class="fa-solid fa-star"></i>
+                <span class="reviews-title">Reviews</span>
+                <span class="reviews-count" v-if="serviceReviews[getServiceId(service)]?.count > 0">
+                  {{ serviceReviews[getServiceId(service)]?.count || 0 }}
+                </span>
+              </div>
+              <div class="reviews-preview" v-if="serviceReviews[getServiceId(service)]?.count > 0">
+                <div class="reviews-rating">
+                  <div class="stars">
+                    <i v-for="n in 5" :key="n" 
+                       class="fa-star"
+                       :class="n <= serviceReviews[getServiceId(service)]?.averageRating ? 'fa-solid' : 'fa-regular'">
+                    </i>
+                  </div>
+                  <span class="rating-value">{{ serviceReviews[getServiceId(service)]?.averageRating?.toFixed(1) || '0.0' }}</span>
+                </div>
+                <p class="reviews-hint">Click to view all reviews</p>
+              </div>
+              <div class="no-reviews" v-else>
+                <i class="fa-regular fa-comment"></i>
+                <span>No reviews yet</span>
+              </div>
+            </div>
+            
             <!-- Availability Summary -->
             <div class="availability-summary">
               <template v-if="getServiceStatus(service) === 'active'">
@@ -194,7 +226,6 @@
                     <i :class="hasAnyRealAvailability(service) ? 'fa-solid fa-calendar-check' : 'fa-solid fa-calendar-xmark'"></i>
                     {{ hasAnyRealAvailability(service) ? 'Available' : 'Not Available' }}
                   </span>
-                  <!-- ✅ UPDATED: Use accurate days count method -->
                   <span class="days-count" v-if="hasAnyRealAvailability(service)">
                     ({{ getAccurateAvailableDaysCount(service) }} days)
                   </span>
@@ -293,7 +324,7 @@
                 </p>
               </div>
             </div>
-            <!-- Quick Availability Toggle (Simple version) -->
+            <!-- Quick Availability Toggle -->
             <div class="form-group">
               <h4>Quick Availability</h4>
               <div class="quick-availability">
@@ -320,18 +351,20 @@
           </div>
         </div>
 
-        <!-- Actions - ONLY EDIT AND DELETE -->
+        <!-- Actions - EDIT, ADD IMAGES, AND DELETE -->
         <div class="card-actions">
           <button class="action-btn edit" @click.stop="startEdit(service)" :disabled="!getServiceId(service)">
-            <i class="fa-solid fa-pen"></i> 
-            Edit {{ getServiceId(service) ? '' : '(No ID)' }}
+            <i class="fa-solid fa-pen"></i> Edit
+          </button>
+          <button class="action-btn add-images" @click.stop="openImagesEditor(service)" :disabled="!getServiceId(service)">
+            <i class="fa-solid fa-images"></i> Add Images
           </button>
           <button class="action-btn delete" @click.stop="confirmDelete(getServiceId(service), service?.title)" :disabled="!getServiceId(service)">
             <i class="fa-solid fa-trash"></i> Delete
           </button>
         </div>
 
-        <!-- ✨ IN-PLACE TIME SLOTS PANEL (slides down below service details) -->
+        <!-- Time Slots Panel -->
         <transition name="slide-down">
           <div v-if="expandedServiceId === getServiceId(service)" class="time-slots-panel">
             <div class="time-slots-panel-header">
@@ -408,110 +441,237 @@
       </div>
     </transition>
 
-    <!-- Banner Editor Modal -->
+    <!-- 🆕 ADDED: Service Images Editor Modal -->
     <transition name="modal-fade">
-      <div v-if="showBannerEditor" class="modal-overlay" @click.self="closeBannerEditor">
-        <div class="modal banner-editor-modal" @click.stop>
+      <div v-if="showImagesEditor" class="modal-overlay" @click.self="closeImagesEditor">
+        <div class="modal images-editor-modal" @click.stop>
           <div class="modal-header">
-            <h2>Edit Service Banner</h2>
-            <button class="close-btn" @click="closeBannerEditor" aria-label="Close">
+            <h2>Add Service Images</h2>
+            <button class="close-btn" @click="closeImagesEditor" aria-label="Close">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
           <div class="modal-content">
-            <!-- Current Banner Preview -->
-            <div class="current-banner-section">
-              <h4>Current Banner</h4>
-              <div class="current-banner-preview">
-                <div v-if="bannerEditorService?.banner" class="banner-preview">
-                  <img :src="bannerEditorService.banner" :alt="bannerEditorService?.title" />
-                  <div class="banner-overlay">
-                    <button class="btn remove-banner-btn" @click="removeBanner">
-                      <i class="fa-solid fa-trash"></i> Remove Banner
+            <!-- Current Images Section -->
+            <div class="current-images-section" v-if="serviceImages.length > 0">
+              <h4>Current Images ({{ serviceImages.length }})</h4>
+              <div class="images-grid">
+                <div v-for="(image, index) in serviceImages" :key="index" class="image-item">
+                  <img :src="getValidImageUrl(image)" :alt="`Service image ${index + 1}`" class="service-image" @error="handleImageError(index)" />
+                  <div class="image-overlay">
+                    <button class="btn delete-image-btn" @click="deleteImage(index)">
+                      <i class="fa-solid fa-trash"></i>
                     </button>
                   </div>
-                </div>
-                <div v-else class="no-banner-message">
-                  <i class="fa-solid fa-image"></i>
-                  <p>No banner uploaded yet</p>
                 </div>
               </div>
             </div>
 
-            <!-- Upload New Banner -->
-            <div class="upload-banner-section">
-              <h4>Upload New Banner</h4>
-              <div class="upload-area" 
-                   @dragover.prevent="dragover = true"
-                   @dragleave.prevent="dragover = false"
-                   @drop.prevent="handleDrop"
-                   :class="{ 'dragover': dragover }">
-                <div v-if="!selectedFile" class="upload-prompt">
+            <!-- Upload New Images -->
+            <div class="upload-images-section">
+              <h4>Upload New Images</h4>
+              
+              <!-- File Upload Area -->
+              <div 
+                class="upload-area" 
+                :class="{ 'dragover': imagesDragover }"
+                @dragover.prevent="imagesDragover = true"
+                @dragleave.prevent="imagesDragover = false"
+                @drop.prevent="handleImagesDrop"
+                @click="triggerImagesInput"
+              >
+                <div class="upload-prompt">
                   <i class="fa-solid fa-cloud-arrow-up"></i>
-                  <p>Drag & drop your image here</p>
-                  <p class="upload-subtext">or click to browse</p>
-                  <input 
-                    type="file" 
-                    ref="fileInput"
-                    accept="image/*"
-                    @change="handleFileSelect"
-                    style="display: none"
-                  />
-                  <button class="btn browse-btn" @click="triggerFileInput">
+                  <p>Click to select images</p>
+                  <p class="upload-subtext">or drag & drop here</p>
+                  <button class="btn browse-btn" @click.stop="triggerImagesInput">
                     <i class="fa-solid fa-folder-open"></i> Browse Files
                   </button>
                   <p class="file-requirements">
-                    Supported formats: JPG, PNG, GIF<br>
-                    Max size: 5MB
+                    Supported formats: JPG, PNG, GIF, WebP<br>
+                    Max size: 5MB per image • Max 10 images
                   </p>
                 </div>
-                <div v-else class="file-selected">
-                  <i class="fa-solid fa-file-image"></i>
-                  <p class="file-name">{{ selectedFile.name }}</p>
-                  <p class="file-size">{{ formatFileSize(selectedFile.size) }}</p>
-                  <div class="file-actions">
-                    <button class="btn change-btn" @click="triggerFileInput">
-                      <i class="fa-solid fa-rotate"></i> Change
-                    </button>
-                    <button class="btn remove-file-btn" @click="selectedFile = null">
-                      <i class="fa-solid fa-times"></i> Remove
+                
+                <!-- Hidden file input -->
+                <input 
+                  ref="imagesInput"
+                  type="file" 
+                  accept="image/*"
+                  multiple
+                  @change="handleImagesSelect"
+                  class="file-input-hidden"
+                />
+              </div>
+
+              <!-- Selected Files Info -->
+              <div v-if="selectedImages.length > 0" class="selected-files-info">
+                <h5>Selected Images ({{ selectedImages.length }})</h5>
+                <div class="selected-images-grid">
+                  <div v-for="(preview, index) in imagesPreview" :key="index" class="selected-image-item">
+                    <img :src="preview" :alt="`Preview ${index + 1}`" class="preview-img" />
+                    <button class="btn remove-selected-btn" @click="removeSelectedImage(index)">
+                      <i class="fa-solid fa-times"></i>
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <!-- Image Preview -->
-              <div v-if="imagePreview" class="image-preview">
-                <h5>Preview</h5>
-                <img :src="imagePreview" alt="Preview" class="preview-img" />
               </div>
             </div>
 
             <!-- Upload Progress -->
-            <div v-if="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+            <div v-if="imagesUploadProgress > 0 && imagesUploadProgress < 100" class="upload-progress">
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+                <div class="progress-fill" :style="{ width: imagesUploadProgress + '%' }"></div>
               </div>
-              <p class="progress-text">Uploading... {{ uploadProgress }}%</p>
+              <p class="progress-text">Uploading... {{ imagesUploadProgress }}%</p>
             </div>
 
             <!-- Error Message -->
-            <div v-if="uploadError" class="upload-error">
+            <div v-if="imagesUploadError" class="upload-error">
               <i class="fa-solid fa-circle-exclamation"></i>
-              <span>{{ uploadError }}</span>
+              <span>{{ imagesUploadError }}</span>
             </div>
 
             <!-- Actions -->
             <div class="modal-actions">
-              <button class="btn cancel-btn" @click="closeBannerEditor" :disabled="uploading">
+              <button class="btn cancel-btn" @click="closeImagesEditor" :disabled="uploadingImages">
                 Cancel
               </button>
-              <button class="btn upload-btn" @click="uploadBanner" :disabled="!selectedFile || uploading">
-                <i v-if="uploading" class="fa-solid fa-spinner fa-spin"></i>
+              <button class="btn upload-btn" @click="uploadImages" :disabled="selectedImages.length === 0 || uploadingImages">
+                <i v-if="uploadingImages" class="fa-solid fa-spinner fa-spin"></i>
                 <i v-else class="fa-solid fa-upload"></i>
-                {{ uploading ? 'Uploading...' : 'Upload Banner' }}
+                {{ uploadingImages ? 'Uploading...' : 'Upload Images' }}
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Reviews Modal -->
+    <transition name="modal-fade">
+      <div v-if="showReviewsModal" class="modal-overlay" @click.self="closeReviewsModal">
+        <div class="modal reviews-modal" @click.stop>
+          <div class="modal-header">
+            <h2>
+              <i class="fa-solid fa-star"></i>
+              Reviews for {{ selectedServiceForReviews?.title || 'Service' }}
+            </h2>
+            <button class="close-btn" @click="closeReviewsModal" aria-label="Close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-content">
+            <!-- Loading State -->
+            <div v-if="loadingReviews" class="reviews-loading">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              <p>Loading reviews...</p>
+            </div>
+            
+            <!-- Reviews Content (only show when not loading) -->
+            <div v-else-if="showReviewsContent">
+              <!-- No Reviews State -->
+              <div v-if="selectedServiceReviews.length === 0" class="no-reviews-content">
+                <i class="fa-regular fa-comment-dots"></i>
+                <h4>No Reviews Yet</h4>
+                <p>This service hasn't received any reviews yet.<br>Reviews will appear here once customers leave feedback.</p>
+              </div>
+              
+              <!-- Has Reviews State -->
+              <div v-else>
+                <!-- Reviews Overview -->
+                <div class="reviews-overview">
+                  <div class="overview-stats">
+                    <div class="overview-stat">
+                      <div class="overview-number">{{ selectedServiceRating.toFixed(1) }}</div>
+                      <div class="overview-label">Average Rating</div>
+                    </div>
+                    <div class="overview-stat">
+                      <div class="overview-number">{{ selectedServiceReviews.length }}</div>
+                      <div class="overview-label">Total Reviews</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Rating Breakdown -->
+                  <div class="rating-breakdown">
+                    <h4>Rating Breakdown</h4>
+                    <div class="rating-bars">
+                      <div class="rating-bar" v-for="(count, rating) in ratingDistribution" :key="rating">
+                        <span class="rating-label">{{ rating }} stars</span>
+                        <div class="bar-container">
+                          <div class="bar-fill" :style="{ 
+                            width: selectedServiceReviews.length > 0 ? 
+                              `${(count / selectedServiceReviews.length) * 100}%` : '0%' 
+                          }"></div>
+                        </div>
+                        <span class="rating-count">{{ count }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Reviews List -->
+                <div class="reviews-list">
+                  <div class="reviews-header">
+                    <h4>Customer Reviews ({{ selectedServiceReviews.length }})</h4>
+                    <select v-model="reviewsSortBy" class="sort-select">
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="highest">Highest Rating</option>
+                      <option value="lowest">Lowest Rating</option>
+                    </select>
+                  </div>
+                  
+                  <div class="review-items">
+                    <div v-for="review in sortedReviews" :key="review._id" class="review-item">
+                      <div class="reviewer-info">
+                        <div class="reviewer-avatar">
+                          {{ getReviewerInitials(review) }}
+                        </div>
+                        <div class="reviewer-details">
+                          <h5 class="reviewer-name">{{ review.reviewerName }}</h5>
+                          <div class="review-meta">
+                            <div class="review-rating">
+                              <i v-for="n in 5" :key="n" 
+                                 class="fa-star"
+                                 :class="n <= review.rating ? 'fa-solid' : 'fa-regular'">
+                              </i>
+                            </div>
+                            <span class="review-date">{{ formatReviewDate(review.createdAt) }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div class="review-content">
+                        <p class="review-message">{{ review.message }}</p>
+                        <div v-if="review.serviceDetails" class="review-service-info">
+                          <small>Service: {{ review.serviceDetails.title }}</small>
+                        </div>
+                      </div>
+                      
+                      <!-- Reply Section -->
+                      <div v-if="review.reply" class="review-reply">
+                        <strong><i class="fa-solid fa-reply"></i> Your Reply</strong>
+                        <p>{{ review.reply }}</p>
+                      </div>
+                      
+                      <!-- Reply Button -->
+                      <div v-else class="review-actions">
+                        <button class="reply-btn" @click="replyToReview(review)">
+                          <i class="fa-solid fa-reply"></i> Reply to Review
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button class="btn close-modal-btn" @click="closeReviewsModal">
+              <i class="fa-solid fa-check"></i> Close
+            </button>
           </div>
         </div>
       </div>
@@ -559,15 +719,31 @@ export default {
         { key: 'saturday', name: 'saturday', label: 'Saturday' },
         { key: 'sunday', name: 'sunday', label: 'Sunday' }
       ],
-      // Banner Editor State
-      showBannerEditor: false,
-      bannerEditorService: null,
-      selectedFile: null,
-      imagePreview: null,
-      dragover: false,
-      uploading: false,
-      uploadProgress: 0,
-      uploadError: null
+      
+      // 🆕 ADDED: Service Images Editor State
+      showImagesEditor: false,
+      imagesEditorService: null,
+      serviceImages: [],
+      selectedImages: [],
+      imagesPreview: [],
+      imagesDragover: false,
+      uploadingImages: false,
+      imagesUploadProgress: 0,
+      imagesUploadError: null,
+      
+      // Reviews State (UPDATED)
+      showReviewsModal: false,
+      showReviewsContent: false, // ✅ NEW: Control when to show content
+      selectedServiceForReviews: null,
+      selectedServiceReviews: [],
+      loadingReviews: false,
+      serviceReviews: {}, // Cache for reviews
+      reviewsStats: {
+        total: 0,
+        averageRating: 0,
+        distribution: {}
+      },
+      reviewsSortBy: 'newest'
     };
   },
   computed: {
@@ -592,188 +768,436 @@ export default {
     },
     draftServicesCount() {
       return this.services.filter(s => this.getServiceStatus(s) === 'draft').length;
+    },
+    selectedServiceRating() {
+      if (this.selectedServiceReviews.length === 0) return 0;
+      const sum = this.selectedServiceReviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+      return Math.round((sum / this.selectedServiceReviews.length) * 10) / 10; // Round to 1 decimal
+    },
+    ratingDistribution() {
+      const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      this.selectedServiceReviews.forEach(review => {
+        const rating = Math.round(review.rating) || 0;
+        if (rating >= 1 && rating <= 5) {
+          distribution[rating]++;
+        }
+      });
+      return distribution;
+    },
+    sortedReviews() {
+      const reviews = [...this.selectedServiceReviews];
+      switch (this.reviewsSortBy) {
+        case 'newest':
+          return reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        case 'oldest':
+          return reviews.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        case 'highest':
+          return reviews.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        case 'lowest':
+          return reviews.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+        default:
+          return reviews;
+      }
+    },
+    // ✅ NEW: Computed property to get service rating from cache
+    getServiceRating() {
+      return (service) => {
+        const serviceId = this.getServiceId(service);
+        if (!serviceId) return 0;
+        
+        if (this.serviceReviews[serviceId]) {
+          return this.serviceReviews[serviceId].averageRating || 0;
+        }
+        return 0;
+      };
+    },
+    // ✅ NEW: Computed property to get review count from cache
+    getReviewCount() {
+      return (service) => {
+        const serviceId = this.getServiceId(service);
+        if (!serviceId) return 0;
+        
+        if (this.serviceReviews[serviceId]) {
+          return this.serviceReviews[serviceId].count || 0;
+        }
+        return 0;
+      };
+    },
+    // ✅ NEW: Check if service has reviews
+    hasReviews() {
+      return (service) => {
+        const serviceId = this.getServiceId(service);
+        if (!serviceId) return false;
+        
+        if (this.serviceReviews[serviceId]) {
+          return (this.serviceReviews[serviceId].count || 0) > 0;
+        }
+        
+        // Also check if service has reviews in its data
+        if (service.reviews && Array.isArray(service.reviews)) {
+          return service.reviews.length > 0;
+        }
+        
+        return false;
+      };
     }
   },
   async created() {
     await this.fetchCategories();
     await this.fetchServices();
+    // ✅ UPDATED: Load reviews for all services but don't block UI
+    this.loadAllReviews().catch(error => {
+      console.warn('Could not load reviews initially:', error);
+    });
   },
   methods: {
-    // ===== BANNER EDITOR METHODS =====
-    openBannerEditor(service) {
+    // ===== BANNER HELPER METHODS =====
+    getValidBannerUrl(service) {
+      if (!service || !service.banner) return null;
+      
+      // If banner is a string URL, return it
+      if (typeof service.banner === 'string') {
+        return service.banner;
+      }
+      
+      // If banner is an object, try to extract URL
+      if (typeof service.banner === 'object') {
+        console.log('🔍 Banner is object, trying to extract URL:', service.banner);
+        
+        // Try to stringify and parse to see the structure
+        try {
+          const bannerStr = JSON.stringify(service.banner);
+          console.log('🔍 Banner object stringified:', bannerStr);
+        } catch (e) {
+          console.log('🔍 Could not stringify banner object');
+        }
+        
+        // Check if it has a toString method
+        if (service.banner.toString && service.banner.toString !== Object.prototype.toString) {
+          const stringValue = service.banner.toString();
+          if (stringValue && typeof stringValue === 'string' && stringValue.startsWith('http')) {
+            console.log('🔍 Found URL via toString():', stringValue);
+            return stringValue;
+          }
+        }
+        
+        // Try common properties where URL might be stored
+        const possibleKeys = ['url', 'imageUrl', 'src', 'path', 'bannerUrl', 'image', 'link', 'uri'];
+        for (const key of possibleKeys) {
+          if (service.banner[key] && typeof service.banner[key] === 'string') {
+            console.log(`✅ Found banner URL in property "${key}":`, service.banner[key]);
+            return service.banner[key];
+          }
+        }
+        
+        // If it's an array, take the first string element
+        if (Array.isArray(service.banner) && service.banner.length > 0) {
+          const firstItem = service.banner[0];
+          if (typeof firstItem === 'string') {
+            return firstItem;
+          } else if (typeof firstItem === 'object') {
+            return this.getValidBannerUrl({ banner: firstItem });
+          }
+        }
+        
+        // Last resort: try any string property
+        for (const key in service.banner) {
+          if (typeof service.banner[key] === 'string' && 
+              (service.banner[key].startsWith('http') || service.banner[key].startsWith('/'))) {
+            console.log(`✅ Found possible banner URL in property "${key}":`, service.banner[key]);
+            return service.banner[key];
+          }
+        }
+      }
+      
+      console.log('❌ Could not extract banner URL from:', service.banner);
+      return null;
+    },
+    
+    handleBannerError(service) {
+      console.error('❌ Banner failed to load for service:', service?.title, 'Banner data:', service?.banner);
+      
+      // Set banner to null to show placeholder
+      if (service) {
+        // Find the service in the array and update it
+        const serviceIndex = this.services.findIndex(s => this.getServiceId(s) === this.getServiceId(service));
+        if (serviceIndex !== -1) {
+          this.services[serviceIndex].banner = null;
+        }
+      }
+    },
+
+    // ===== SERVICE IMAGES METHODS =====
+    getServiceImages(service) {
+      if (!service || !service.images) return [];
+      return Array.isArray(service.images) ? service.images : [service.images];
+    },
+    
+    getValidImageUrl(image) {
+      if (!image) return '';
+      
+      // If image is a string URL, return it
+      if (typeof image === 'string') {
+        return image;
+      }
+      
+      // If image is an object, try to extract URL
+      if (typeof image === 'object') {
+        const possibleKeys = ['url', 'imageUrl', 'src', 'path', 'image', 'link', 'uri'];
+        for (const key of possibleKeys) {
+          if (image[key] && typeof image[key] === 'string') {
+            return image[key];
+          }
+        }
+        
+        // Try any string property that looks like a URL
+        for (const key in image) {
+          if (typeof image[key] === 'string' && 
+              (image[key].startsWith('http') || image[key].startsWith('/'))) {
+            return image[key];
+          }
+        }
+      }
+      
+      return '';
+    },
+    
+    handleImageError(index) {
+      console.error('❌ Service image failed to load at index:', index);
+      // You could set a placeholder or remove the broken image
+      if (this.serviceImages[index]) {
+        // Replace with a placeholder or remove
+        this.serviceImages.splice(index, 1, 'https://via.placeholder.com/150?text=Image+Error');
+      }
+    },
+
+    openImagesEditor(service) {
       if (!service) {
-        this.setError("Cannot edit banner: Service data is missing");
+        this.setError("Cannot edit images: Service data is missing");
         return;
       }
       
       const serviceId = this.getServiceId(service);
       if (!serviceId) {
-        this.setError("Cannot edit banner: Service ID is missing");
+        this.setError("Cannot edit images: Service ID is missing");
         return;
       }
       
-      this.bannerEditorService = { ...service };
-      this.selectedFile = null;
-      this.imagePreview = null;
-      this.uploadError = null;
-      this.uploadProgress = 0;
-      this.showBannerEditor = true;
+      this.imagesEditorService = { ...service };
+      this.serviceImages = this.getServiceImages(service);
+      this.selectedImages = [];
+      this.imagesPreview = [];
+      this.imagesUploadError = null;
+      this.imagesUploadProgress = 0;
+      this.showImagesEditor = true;
+      
+      console.log('📸 Opening images editor for service:', service.title, 'Images:', this.serviceImages);
     },
-    
-    closeBannerEditor() {
-      if (this.uploading) return;
-      this.showBannerEditor = false;
-      this.bannerEditorService = null;
-      this.selectedFile = null;
-      this.imagePreview = null;
-      this.uploadError = null;
-      this.uploadProgress = 0;
-      this.dragover = false;
+
+    closeImagesEditor() {
+      if (this.uploadingImages) return;
+      this.showImagesEditor = false;
+      this.imagesEditorService = null;
+      this.serviceImages = [];
+      this.selectedImages = [];
+      this.imagesPreview = [];
+      this.imagesUploadError = null;
+      this.imagesDragover = false;
+      this.imagesUploadProgress = 0;
     },
-    
-    triggerFileInput() {
-      this.$refs.fileInput?.click();
+
+    triggerImagesInput() {
+      this.$refs.imagesInput?.click();
     },
-    
-    handleFileSelect(event) {
-      const file = event.target.files[0];
-      if (file) {
-        this.validateAndSetFile(file);
+
+    handleImagesSelect(event) {
+      const files = Array.from(event.target.files);
+      if (files.length > 0) {
+        console.log('📁 Files selected:', files.length);
+        this.validateAndSetImages(files);
       }
     },
-    
-    handleDrop(event) {
-      this.dragover = false;
-      const file = event.dataTransfer.files[0];
-      if (file) {
-        this.validateAndSetFile(file);
+
+    handleImagesDrop(event) {
+      this.imagesDragover = false;
+      const files = Array.from(event.dataTransfer.files);
+      if (files.length > 0) {
+        console.log('📁 Files dropped:', files.length);
+        this.validateAndSetImages(files);
       }
     },
-    
-    validateAndSetFile(file) {
-      // Check file type
+
+    validateAndSetImages(files) {
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        this.uploadError = 'Please select a valid image file (JPG, PNG, GIF, WebP)';
-        return;
-      }
-      
-      // Check file size (5MB limit)
       const maxSize = 5 * 1024 * 1024; // 5MB
-      if (file.size > maxSize) {
-        this.uploadError = 'File size must be less than 5MB';
+      const maxFiles = 10;
+      
+      // Check total files count
+      if (this.selectedImages.length + files.length > maxFiles) {
+        this.imagesUploadError = `Maximum ${maxFiles} images allowed`;
         return;
       }
-      
-      this.selectedFile = file;
-      this.uploadError = null;
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.imagePreview = e.target.result;
-      };
-      reader.readAsDataURL(file);
+
+      const validFiles = [];
+      const invalidFiles = [];
+
+      files.forEach(file => {
+        // Check file type
+        if (!validTypes.includes(file.type)) {
+          invalidFiles.push(`${file.name}: Invalid file type (${file.type})`);
+          return;
+        }
+
+        // Check file size
+        if (file.size > maxSize) {
+          invalidFiles.push(`${file.name}: File size (${this.formatFileSize(file.size)}) exceeds 5MB`);
+          return;
+        }
+
+        validFiles.push(file);
+      });
+
+      if (invalidFiles.length > 0) {
+        this.imagesUploadError = invalidFiles.join(', ');
+      }
+
+      if (validFiles.length > 0) {
+        this.selectedImages = [...this.selectedImages, ...validFiles];
+        this.generateImagesPreview(validFiles);
+        this.imagesUploadError = null; // Clear previous errors
+        console.log('✅ Valid files selected:', validFiles.length);
+      }
     },
-    
-    formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+
+    generateImagesPreview(files) {
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.imagesPreview.push(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      });
     },
-    
-    async removeBanner() {
-      if (!this.bannerEditorService) return;
-      
+
+    removeSelectedImage(index) {
+      this.selectedImages.splice(index, 1);
+      this.imagesPreview.splice(index, 1);
+      console.log('🗑️ Removed selected image at index:', index);
+    },
+
+    async deleteImage(index) {
+      const serviceId = this.getServiceId(this.imagesEditorService);
+      if (!serviceId) return;
+
       try {
-        const serviceId = this.getServiceId(this.bannerEditorService);
-        await http.put(`/services/${serviceId}`, {
-          ...this.bannerEditorService,
-          banner: null
-        });
+        const images = [...this.serviceImages];
+        images.splice(index, 1);
         
+        // Update service with new images array
+        await http.put(`/services/${serviceId}`, {
+          ...this.imagesEditorService,
+          images: images
+        });
+
         // Update local state
+        this.serviceImages = images;
         const serviceIndex = this.services.findIndex(s => this.getServiceId(s) === serviceId);
         if (serviceIndex !== -1) {
-          this.services[serviceIndex].banner = null;
+          this.services[serviceIndex].images = images;
         }
-        
-        this.setSuccess("Banner removed successfully!");
-        this.closeBannerEditor();
+
+        this.setSuccess("Image removed successfully!");
       } catch (error) {
-        console.error("Failed to remove banner:", error);
-        this.setError("Failed to remove banner. Please try again.");
+        console.error("Failed to delete image:", error);
+        this.setError("Failed to delete image. Please try again.");
       }
     },
-    
-    async uploadBanner() {
-      if (!this.selectedFile || !this.bannerEditorService) return;
-      
-      const serviceId = this.getServiceId(this.bannerEditorService);
-      if (!serviceId) {
-        this.setError("Cannot upload banner: Service ID is missing");
+
+    async uploadImages() {
+      if (this.selectedImages.length === 0 || !this.imagesEditorService) {
+        this.imagesUploadError = "Please select images to upload";
         return;
       }
       
-      this.uploading = true;
-      this.uploadError = null;
-      this.uploadProgress = 10;
+      const serviceId = this.getServiceId(this.imagesEditorService);
+      if (!serviceId) {
+        this.setError("Cannot upload images: Service ID is missing");
+        return;
+      }
+      
+      this.uploadingImages = true;
+      this.imagesUploadError = null;
+      this.imagesUploadProgress = 10;
+      
+      console.log('🚀 Starting upload of', this.selectedImages.length, 'images for service:', serviceId);
       
       try {
-        // Create FormData for file upload
+        // Create FormData for all images
         const formData = new FormData();
-        formData.append('banner', this.selectedFile);
-        formData.append('serviceId', serviceId);
+        this.selectedImages.forEach((file, index) => {
+          formData.append('images', file);
+          console.log(`📤 Adding file to FormData: ${file.name} (${this.formatFileSize(file.size)})`);
+        });
         
-        // Simulate upload progress (replace with actual progress tracking)
+        // Simulate upload progress
         const progressInterval = setInterval(() => {
-          if (this.uploadProgress < 90) {
-            this.uploadProgress += 10;
+          if (this.imagesUploadProgress < 90) {
+            this.imagesUploadProgress += 10;
           }
         }, 200);
         
-        // Upload the banner
-        const response = await http.post('/services/upload-banner', formData, {
+        // 🚀 UPDATED: Use the correct endpoint for uploading images
+        console.log(`🌐 Making POST request to: /services/${serviceId}/images`);
+        const response = await http.post(`/services/${serviceId}/images`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
-          // Add onUploadProgress callback if your API supports it
         });
         
         clearInterval(progressInterval);
-        this.uploadProgress = 100;
+        this.imagesUploadProgress = 100;
         
-        const bannerUrl = response.data.bannerUrl;
+        console.log('✅ Upload response:', response.data);
+        const uploadedImages = response.data.images || response.data || [];
+        console.log('✅ Uploaded images:', uploadedImages);
         
-        // Update service with new banner URL
+        // Update service with new images (append to existing)
+        const existingImages = this.serviceImages;
+        const newImages = [...existingImages, ...uploadedImages];
+        
+        console.log('🔄 Updating service with new images array:', newImages);
         await http.put(`/services/${serviceId}`, {
-          ...this.bannerEditorService,
-          banner: bannerUrl
+          ...this.imagesEditorService,
+          images: newImages
         });
         
         // Update local state
+        this.serviceImages = newImages;
         const serviceIndex = this.services.findIndex(s => this.getServiceId(s) === serviceId);
         if (serviceIndex !== -1) {
-          this.services[serviceIndex].banner = bannerUrl;
+          this.services[serviceIndex].images = newImages;
         }
         
-        this.setSuccess("Banner updated successfully!");
+        this.setSuccess(`Successfully uploaded ${uploadedImages.length} image(s)!`);
+        
+        // Clear selected images and close modal after delay
+        this.selectedImages = [];
+        this.imagesPreview = [];
         setTimeout(() => {
-          this.closeBannerEditor();
-        }, 500);
+          this.closeImagesEditor();
+        }, 1500);
         
       } catch (error) {
-        console.error("Failed to upload banner:", error);
-        this.uploadError = error.response?.data?.message || "Failed to upload banner. Please try again.";
+        console.error("❌ Failed to upload images:", error);
+        console.error("❌ Error response:", error.response?.data);
+        this.imagesUploadError = error.response?.data?.message || error.message || "Failed to upload images. Please try again.";
       } finally {
-        this.uploading = false;
-        this.uploadProgress = 0;
+        this.uploadingImages = false;
+        this.imagesUploadProgress = 0;
       }
     },
-    
-    // ===== EXISTING METHODS (keep all your existing methods) =====
+
+    // ===== EXISTING METHODS (preserved) =====
     getServiceStatus(service) {
       if (!service) return 'draft';
       if (!service.slots || !Array.isArray(service.slots) || service.slots.length === 0) {
@@ -972,11 +1396,6 @@ export default {
       }
     },
     
-    handleBannerError(service) {
-      console.error('❌ Banner failed to load:', service?.banner);
-      service.banner = null;
-    },
-    
     startEdit(service) {
       if (!service) {
         this.setError("Cannot edit service: Service data is missing");
@@ -1110,12 +1529,1434 @@ export default {
       } else {
         this.editingServiceData.slots = [];
       }
+    },
+
+    // ===== REVIEWS METHODS (IMPROVED) =====
+    async loadAllReviews() {
+      try {
+        console.log('📊 Loading reviews for all services...');
+        
+        // Only load if we have services
+        if (!this.services || this.services.length === 0) {
+          console.log('📊 No services to load reviews for');
+          return;
+        }
+        
+        // Load reviews for each service in parallel
+        const reviewPromises = this.services.map(async (service) => {
+          const serviceId = this.getServiceId(service);
+          if (!serviceId) return null;
+          
+          try {
+            // ✅ FIXED: Try the correct endpoint format
+            const endpoint = `/reviews/service/${serviceId}`;
+            console.log(`🌐 Fetching reviews from: ${endpoint}`);
+            
+            const response = await http.get(endpoint);
+            const data = response.data;
+            
+            let reviews = [];
+            // Handle different response structures
+            if (Array.isArray(data)) {
+              reviews = data;
+            } else if (data && data.reviews && Array.isArray(data.reviews)) {
+              reviews = data.reviews;
+            } else if (data && data.data && Array.isArray(data.data)) {
+              reviews = data.data;
+            }
+            
+            console.log(`📊 Found ${reviews.length} reviews for service ${service.title}`);
+            
+            // Process reviews
+            const processedReviews = reviews.map(review => ({
+              _id: review._id || review.id || Math.random().toString(36).substr(2, 9),
+              reviewerName: review.customerName || review.reviewerName || review.user?.name || review.customer?.name || 'Anonymous',
+              reviewerEmail: review.customerEmail || review.reviewerEmail || review.user?.email || review.customer?.email,
+              rating: review.rating || 0,
+              message: review.review || review.message || review.comment || review.content || '',
+              createdAt: review.createdAt || review.date || review.timestamp || new Date().toISOString(),
+              serviceDetails: review.service || service,
+              reply: review.reply || review.response || ''
+            }));
+            
+            // Calculate average rating
+            let averageRating = 0;
+            if (processedReviews.length > 0) {
+              averageRating = processedReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / processedReviews.length;
+            }
+            
+            // Cache the reviews
+            this.serviceReviews[serviceId] = {
+              reviews: processedReviews,
+              count: processedReviews.length,
+              averageRating: averageRating
+            };
+            
+            return {
+              serviceId,
+              count: processedReviews.length,
+              averageRating
+            };
+          } catch (error) {
+            console.log(`⚠️ Could not load reviews for service ${serviceId}:`, error.message);
+            // Initialize empty reviews cache
+            this.serviceReviews[serviceId] = {
+              reviews: [],
+              count: 0,
+              averageRating: 0
+            };
+            return null;
+          }
+        });
+        
+        const results = await Promise.all(reviewPromises);
+        const successfulLoads = results.filter(r => r !== null && r.count > 0);
+        
+        console.log(`📊 Reviews loaded: ${successfulLoads.length} services have reviews`);
+        
+        // Update overall stats
+        this.updateReviewsStats();
+        
+      } catch (error) {
+        console.error('Error loading all reviews:', error);
+      }
+    },
+    
+    async viewServiceReviews(service) {
+      const serviceId = this.getServiceId(service);
+      if (!serviceId) {
+        this.setError("Cannot view reviews: Service ID is missing");
+        return;
+      }
+      
+      this.selectedServiceForReviews = service;
+      this.loadingReviews = true;
+      this.showReviewsModal = true;
+      this.showReviewsContent = false; // ✅ NEW: Hide content initially
+      this.selectedServiceReviews = [];
+      
+      console.log(`🔍 Opening reviews for service: ${service.title} (${serviceId})`);
+      
+      try {
+        // Check if we have cached reviews
+        if (this.serviceReviews[serviceId]?.reviews && this.serviceReviews[serviceId].reviews.length > 0) {
+          console.log(`✅ Using cached reviews: ${this.serviceReviews[serviceId].reviews.length} reviews found`);
+          this.selectedServiceReviews = this.serviceReviews[serviceId].reviews;
+          this.loadingReviews = false;
+          this.showReviewsContent = true; // ✅ NEW: Show content after loading
+          return;
+        }
+        
+        // Try to fetch fresh reviews
+        const endpoint = `/reviews/service/${serviceId}`;
+        console.log(`🌐 Fetching reviews from: ${endpoint}`);
+        
+        const response = await http.get(endpoint);
+        const data = response.data;
+        
+        let reviews = [];
+        
+        // Handle different response structures
+        if (Array.isArray(data)) {
+          reviews = data;
+          console.log(`✅ Got array of ${reviews.length} reviews`);
+        } else if (data && data.reviews && Array.isArray(data.reviews)) {
+          reviews = data.reviews;
+          console.log(`✅ Got reviews array in 'reviews' property: ${reviews.length} reviews`);
+        } else if (data && data.data && Array.isArray(data.data)) {
+          reviews = data.data;
+          console.log(`✅ Got reviews array in 'data' property: ${reviews.length} reviews`);
+        } else {
+          console.log(`⚠️ Unexpected response structure:`, data);
+        }
+        
+        if (reviews.length === 0) {
+          console.log('ℹ️ No reviews found for this service');
+          this.selectedServiceReviews = [];
+          this.serviceReviews[serviceId] = {
+            reviews: [],
+            count: 0,
+            averageRating: 0
+          };
+          this.loadingReviews = false;
+          this.showReviewsContent = true; // ✅ NEW: Show content even if no reviews
+          return;
+        }
+        
+        // Process the reviews
+        this.selectedServiceReviews = reviews.map(review => ({
+          _id: review._id || review.id || Math.random().toString(36).substr(2, 9),
+          reviewerName: review.customerName || review.reviewerName || review.user?.name || review.customer?.name || 'Anonymous',
+          reviewerEmail: review.customerEmail || review.reviewerEmail || review.user?.email || review.customer?.email,
+          rating: review.rating || 0,
+          message: review.review || review.message || review.comment || review.content || '',
+          createdAt: review.createdAt || review.date || review.timestamp || new Date().toISOString(),
+          serviceDetails: review.service || service,
+          reply: review.reply || review.response || ''
+        }));
+        
+        console.log(`✅ Processed ${this.selectedServiceReviews.length} reviews`);
+        
+        // Cache the reviews
+        this.serviceReviews[serviceId] = {
+          reviews: this.selectedServiceReviews,
+          count: this.selectedServiceReviews.length,
+          averageRating: this.selectedServiceReviews.length > 0 
+            ? this.selectedServiceReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / this.selectedServiceReviews.length
+            : 0
+        };
+        
+        this.updateReviewsStats();
+        
+      } catch (error) {
+        console.error('❌ Error fetching reviews:', error);
+        console.error('❌ Error details:', error.response?.data || error.message);
+        
+        // Even if there's an error, show the modal with no reviews
+        this.selectedServiceReviews = [];
+        this.serviceReviews[serviceId] = {
+          reviews: [],
+          count: 0,
+          averageRating: 0
+        };
+        
+        // Don't show error to user, just show empty state
+      } finally {
+        this.loadingReviews = false;
+        this.showReviewsContent = true; // ✅ NEW: Show content after loading
+      }
+    },
+    
+    updateReviewsStats() {
+      let totalReviews = 0;
+      let totalRating = 0;
+      
+      Object.values(this.serviceReviews).forEach(serviceReview => {
+        if (serviceReview.count > 0) {
+          totalReviews += serviceReview.count;
+          totalRating += serviceReview.averageRating * serviceReview.count;
+        }
+      });
+      
+      this.reviewsStats = {
+        total: totalReviews,
+        averageRating: totalReviews > 0 ? Math.round((totalRating / totalReviews) * 10) / 10 : 0,
+        distribution: this.calculateOverallRatingDistribution()
+      };
+    },
+    
+    calculateOverallRatingDistribution() {
+      const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      
+      Object.values(this.serviceReviews).forEach(serviceReview => {
+        if (serviceReview.reviews && Array.isArray(serviceReview.reviews)) {
+          serviceReview.reviews.forEach(review => {
+            const rating = Math.round(review.rating) || 0;
+            if (rating >= 1 && rating <= 5) {
+              distribution[rating]++;
+            }
+          });
+        }
+      });
+      
+      return distribution;
+    },
+    
+    closeReviewsModal() {
+      this.showReviewsModal = false;
+      this.showReviewsContent = false; // ✅ NEW: Hide content
+      this.selectedServiceForReviews = null;
+      this.selectedServiceReviews = [];
+      this.reviewsSortBy = 'newest';
+    },
+    
+    getReviewerInitials(review) {
+      const name = review.reviewerName || 'Anonymous';
+      return name
+        .split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+    },
+    
+    formatReviewDate(dateString) {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      } catch (error) {
+        return '';
+      }
+    },
+    
+    async replyToReview(review) {
+      const reply = prompt('Enter your reply to this review:');
+      if (!reply) return;
+      
+      try {
+        await http.post(`/reviews/${review._id}/reply`, { reply });
+        review.reply = reply;
+        this.setSuccess('Reply sent successfully!');
+      } catch (error) {
+        console.error('Error replying to review:', error);
+        this.setError('Failed to send reply. Please try again.');
+      }
+    },
+
+    // ===== HELPER METHODS =====
+    formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
   }
 };
 </script>
 
 <style scoped>
+/* 🆕 ADDED: Images Editor Modal Styles */
+.images-editor-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.images-editor-modal .modal-content {
+  padding: 1.5rem;
+}
+
+.current-images-section,
+.upload-images-section {
+  margin-bottom: 1.5rem;
+}
+
+.current-images-section h4,
+.upload-images-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.image-item {
+  position: relative;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.delete-image-btn {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-image-btn:hover {
+  background: #c53030;
+  transform: scale(1.1);
+}
+
+.upload-area {
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background: #f7fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.upload-area.dragover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+
+.upload-prompt i {
+  font-size: 2.5rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+}
+
+.upload-prompt p {
+  color: #718096;
+  margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.browse-btn {
+  background: #3182ce;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  transition: all 0.2s ease;
+}
+
+.browse-btn:hover {
+  background: #2c5282;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.selected-files-info {
+  margin-top: 1.5rem;
+}
+
+.selected-files-info h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.selected-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+}
+
+.selected-image-item {
+  position: relative;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-selected-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-selected-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.upload-progress {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #3182ce;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  color: #718096;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.upload-error {
+  background: #fed7d7;
+  border: 1px solid #fc8181;
+  color: #c53030;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* 🗑️ REMOVED: Add Images button styles from banner area */
+
+/* 🆕 ADDED: Add Images action button */
+.action-btn.add-images {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.action-btn.add-images:hover:not(:disabled) {
+  background: #bfdbfe;
+}
+
+/* ===== ALL OTHER STYLES REMAIN THE SAME AS BEFORE ===== */
+/* ... (rest of the styles remain exactly the same as in the previous code) ... */
+
+</style>
+
+<style scoped>
+/* 🆕 ADDED: Images Editor Modal Styles */
+.images-editor-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.images-editor-modal .modal-content {
+  padding: 1.5rem;
+}
+
+.current-images-section,
+.upload-images-section {
+  margin-bottom: 1.5rem;
+}
+
+.current-images-section h4,
+.upload-images-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.image-item {
+  position: relative;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.delete-image-btn {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-image-btn:hover {
+  background: #c53030;
+  transform: scale(1.1);
+}
+
+.upload-area {
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background: #f7fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.upload-area.dragover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+
+.upload-prompt i {
+  font-size: 2.5rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+}
+
+.upload-prompt p {
+  color: #718096;
+  margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.browse-btn {
+  background: #3182ce;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  transition: all 0.2s ease;
+}
+
+.browse-btn:hover {
+  background: #2c5282;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.selected-files-info {
+  margin-top: 1.5rem;
+}
+
+.selected-files-info h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.selected-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+}
+
+.selected-image-item {
+  position: relative;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-selected-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-selected-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.upload-progress {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #3182ce;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  color: #718096;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.upload-error {
+  background: #fed7d7;
+  border: 1px solid #fc8181;
+  color: #c53030;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* 🆕 ADDED: Add Images button styles */
+.add-images-btn {
+  background: rgba(139, 92, 246, 0.9);
+  color: white;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.add-images-btn:hover {
+  background: rgba(124, 58, 237, 0.9);
+  transform: translateY(-1px);
+}
+
+/* 🆕 ADDED: Add Images action button */
+.action-btn.add-images {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.action-btn.add-images:hover:not(:disabled) {
+  background: #bfdbfe;
+}
+
+/* ===== ALL OTHER STYLES REMAIN THE SAME AS BEFORE ===== */
+/* ... (rest of the styles remain exactly the same as in the previous code) ... */
+
+
+/* 🆕 ADDED: Images Editor Modal Styles */
+.images-editor-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.images-editor-modal .modal-content {
+  padding: 1.5rem;
+}
+
+.current-images-section,
+.upload-images-section {
+  margin-bottom: 1.5rem;
+}
+
+.current-images-section h4,
+.upload-images-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.image-item {
+  position: relative;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.delete-image-btn {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-image-btn:hover {
+  background: #c53030;
+  transform: scale(1.1);
+}
+
+.upload-area {
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background: #f7fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.upload-area.dragover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+
+.upload-prompt i {
+  font-size: 2.5rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+}
+
+.upload-prompt p {
+  color: #718096;
+  margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+  font-size: 0.875rem;
+  color: #a0aec0;
+}
+
+.browse-btn {
+  background: #3182ce;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  transition: all 0.2s ease;
+}
+
+.browse-btn:hover {
+  background: #2c5282;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.selected-files-info {
+  margin-top: 1.5rem;
+}
+
+.selected-files-info h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.selected-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+}
+
+.selected-image-item {
+  position: relative;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-selected-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-selected-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+/* 🆕 ADDED: Add Images button styles */
+.add-images-btn {
+  background: rgba(139, 92, 246, 0.9);
+  color: white;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.add-images-btn:hover {
+  background: rgba(124, 58, 237, 0.9);
+  transform: translateY(-1px);
+}
+
+/* 🆕 ADDED: Add Images action button */
+.action-btn.add-images {
+  background: #8b5cf6;
+  color: white;
+}
+
+.action-btn.add-images:hover:not(:disabled) {
+  background: #7c3aed;
+}
+
+/* 🗑️ REMOVED: Edit Banner button styles */
+
+/* ===== REVIEWS STYLES ===== */
+.reviews-summary {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reviews-summary:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  transform: translateY(-1px);
+}
+
+.reviews-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.reviews-title {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.9rem;
+}
+
+.reviews-count {
+  background: #3182ce;
+  color: white;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.reviews-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.reviews-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stars {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.stars .fa-star {
+  color: #fbbf24;
+  font-size: 0.75rem;
+}
+
+.stars .fa-regular.fa-star {
+  color: #d1d5db;
+}
+
+.rating-value {
+  font-weight: 700;
+  color: #2d3748;
+  font-size: 0.875rem;
+}
+
+.reviews-hint {
+  font-size: 0.75rem;
+  color: #718096;
+  margin: 0;
+}
+
+.no-reviews {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #a0aec0;
+  font-size: 0.875rem;
+}
+
+.reviews-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.reviews-modal .modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.reviews-overview {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.overview-stats {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.overview-stat {
+  text-align: center;
+}
+
+.overview-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #3182ce;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.overview-label {
+  font-size: 0.875rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+.rating-breakdown h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+
+.rating-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rating-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rating-label {
+  width: 60px;
+  font-size: 0.875rem;
+  color: #4a5568;
+}
+
+.bar-container {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: #3182ce;
+  border-radius: 4px;
+}
+
+.rating-count {
+  width: 30px;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.reviews-loading {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.reviews-loading i {
+  font-size: 2rem;
+  color: #3182ce;
+  margin-bottom: 1rem;
+}
+
+.reviews-loading p {
+  color: #718096;
+}
+
+.no-reviews-content {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.no-reviews-content i {
+  font-size: 3rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+}
+
+.no-reviews-content h4 {
+  font-size: 1.25rem;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.no-reviews-content p {
+  color: #718096;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.reviews-list {
+  margin-top: 1.5rem;
+}
+
+.reviews-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.reviews-header h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.sort-select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+}
+
+.review-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.review-item {
+  padding: 1.25rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.reviewer-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.reviewer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3182ce;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.reviewer-details {
+  flex: 1;
+}
+
+.reviewer-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 0.25rem 0;
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.review-rating {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.review-rating .fa-star {
+  color: #fbbf24;
+  font-size: 0.75rem;
+}
+
+.review-rating .fa-regular.fa-star {
+  color: #d1d5db;
+}
+
+.review-date {
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+.review-content {
+  margin-bottom: 1rem;
+}
+
+.review-message {
+  color: #4a5568;
+  line-height: 1.5;
+  margin: 0 0 0.5rem 0;
+}
+
+.review-service-info {
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+.review-actions {
+  margin-top: 1rem;
+}
+
+.reply-btn {
+  background: #3182ce;
+  color: white;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.reply-btn:hover {
+  background: #2c5282;
+}
+
+.review-reply {
+  background: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #38a169;
+}
+
+.review-reply strong {
+  color: #38a169;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.review-reply p {
+  color: #4a5568;
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.close-modal-btn {
+  background: #3182ce;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.close-modal-btn:hover {
+  background: #2c5282;
+}
+
+.stat-icon.reviews {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 /* ===== BASE STYLES ===== */
 .services-section {
   padding: 2rem;
@@ -1440,26 +3281,7 @@ export default {
   z-index: 3;
 }
 
-.edit-banner-btn {
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  border: none;
-  padding: 0.375rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(4px);
-}
-
-.edit-banner-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  transform: translateY(-1px);
-}
+/* 🗑️ REMOVED: .edit-banner-btn styles */
 
 .banner-img {
   width: 100%;
@@ -1819,6 +3641,15 @@ export default {
   background: #90cdf4;
 }
 
+.action-btn.add-images {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.action-btn.add-images:hover:not(:disabled) {
+  background: #bfdbfe;
+}
+
 .action-btn.delete {
   background: #fed7d7;
   color: #c53030;
@@ -2052,291 +3883,6 @@ export default {
   margin: 0.5rem 0;
 }
 
-/* ===== BANNER EDITOR MODAL ===== */
-.banner-editor-modal {
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.banner-editor-modal .modal-content {
-  padding: 1.5rem;
-}
-
-.current-banner-section h4,
-.upload-banner-section h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 0.75rem;
-}
-
-.current-banner-preview {
-  margin-bottom: 1.5rem;
-}
-
-.banner-preview {
-  position: relative;
-  height: 150px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-}
-
-.banner-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.banner-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 0.75rem;
-  display: flex;
-  justify-content: center;
-}
-
-.remove-banner-btn {
-  background: #e53e3e;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.remove-banner-btn:hover {
-  background: #c53030;
-}
-
-.no-banner-message {
-  height: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #f7fafc;
-  border: 2px dashed #cbd5e0;
-  border-radius: 8px;
-  color: #a0aec0;
-}
-
-.no-banner-message i {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-}
-
-.upload-area {
-  border: 2px dashed #cbd5e0;
-  border-radius: 8px;
-  padding: 2rem;
-  text-align: center;
-  background: #f7fafc;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 1rem;
-}
-
-.upload-area.dragover {
-  border-color: #3182ce;
-  background: #ebf8ff;
-}
-
-.upload-prompt i {
-  font-size: 2.5rem;
-  color: #a0aec0;
-  margin-bottom: 1rem;
-}
-
-.upload-prompt p {
-  color: #718096;
-  margin-bottom: 0.5rem;
-}
-
-.upload-subtext {
-  font-size: 0.875rem;
-  color: #a0aec0;
-}
-
-.browse-btn {
-  background: #3182ce;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  transition: all 0.2s ease;
-}
-
-.browse-btn:hover {
-  background: #2c5282;
-}
-
-.file-requirements {
-  font-size: 0.75rem;
-  color: #a0aec0;
-  margin-top: 0.75rem;
-  line-height: 1.4;
-}
-
-.file-selected {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.file-selected i {
-  font-size: 2rem;
-  color: #38a169;
-  margin-bottom: 0.5rem;
-}
-
-.file-name {
-  font-weight: 500;
-  color: #2d3748;
-  margin-bottom: 0.25rem;
-  word-break: break-all;
-  text-align: center;
-}
-
-.file-size {
-  font-size: 0.875rem;
-  color: #718096;
-  margin-bottom: 1rem;
-}
-
-.file-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.change-btn {
-  background: #3182ce;
-  color: white;
-  border: none;
-  padding: 0.375rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.change-btn:hover {
-  background: #2c5282;
-}
-
-.remove-file-btn {
-  background: #e53e3e;
-  color: white;
-  border: none;
-  padding: 0.375rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.remove-file-btn:hover {
-  background: #c53030;
-}
-
-.image-preview {
-  margin-top: 1rem;
-}
-
-.image-preview h5 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #4a5568;
-  margin-bottom: 0.5rem;
-}
-
-.preview-img {
-  width: 100%;
-  max-height: 150px;
-  object-fit: contain;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-}
-
-.upload-progress {
-  margin: 1rem 0;
-}
-
-.progress-bar {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #3182ce;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 0.875rem;
-  color: #718096;
-  text-align: center;
-  margin-top: 0.5rem;
-}
-
-.upload-error {
-  background: #fed7d7;
-  border: 1px solid #fc8181;
-  color: #c53030;
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin: 1rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.upload-btn {
-  background: #38a169;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.upload-btn:hover:not(:disabled) {
-  background: #2f855a;
-}
-
-.upload-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* ===== MODALS ===== */
 .modal-overlay {
   position: fixed;
@@ -2551,8 +4097,17 @@ export default {
     width: 100%;
   }
   
-  .banner-editor-modal {
+  .images-editor-modal {
     max-width: 90%;
+  }
+  
+  /* Adjust card actions for mobile */
+  .card-actions {
+    flex-direction: column;
+  }
+  
+  .action-btn {
+    width: 100%;
   }
 }
 
@@ -2582,14 +4137,6 @@ export default {
     font-size: 1.5rem;
   }
   
-  .card-actions {
-    flex-direction: column;
-  }
-  
-  .action-btn {
-    width: 100%;
-  }
-  
   .time-slots-panel-header {
     flex-direction: column;
     gap: 0.75rem;
@@ -2600,12 +4147,20 @@ export default {
     font-size: 0.95rem;
   }
   
-  .banner-editor-modal .modal-content {
+  .images-editor-modal .modal-content {
     padding: 1rem;
   }
   
   .upload-area {
     padding: 1.5rem;
+  }
+  
+  .images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+  
+  .image-item {
+    height: 100px;
   }
 }
 
@@ -2649,7 +4204,7 @@ export default {
     font-size: 1rem;
   }
   
-  .edit-banner-btn {
+  .add-images-btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.7rem;
   }
@@ -2672,7 +4227,7 @@ export default {
 .add-slots-btn:focus-visible,
 .search-input input:focus-visible,
 .status-filter select:focus-visible,
-.edit-banner-btn:focus-visible {
+.add-images-btn:focus-visible {
   outline: 2px solid #3182ce;
   outline-offset: 2px;
 }
@@ -2734,8 +4289,8 @@ export default {
     color: #e2e8f0;
   }
   
-  .edit-banner-btn {
-    background: rgba(255, 255, 255, 0.2);
+  .add-images-btn {
+    background: rgba(139, 92, 246, 0.7);
   }
 }
 
@@ -2746,7 +4301,7 @@ export default {
   .service-status-badge,
   .controls-bar,
   .add-service-btn,
-  .edit-banner-btn {
+  .add-images-btn {
     display: none !important;
   }
   

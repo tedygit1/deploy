@@ -414,8 +414,9 @@ export default {
 </script>
 
 <style scoped>
-/* ===== ENHANCED PROFILE SECTION ===== */
+/* ===== ENHANCED & FULLY RESPONSIVE PROFILE SECTION ===== */
 .profile-section {
+  width: 100%;
   max-width: 1000px;
   margin: 0 auto;
   padding: 0;
@@ -429,8 +430,8 @@ export default {
 
 /* Enhanced Header */
 .profile-header {
-  background: linear-gradient(135deg, #4e5368 0%, #7c86e5 100%);
-  padding: 24px 32px;
+  background: linear-gradient(135deg, #5c5e65 0%, #555984 100%);
+  padding: clamp(16px, 4vw, 24px) clamp(16px, 5vw, 32px);
   position: relative;
   overflow: hidden;
 }
@@ -449,13 +450,13 @@ export default {
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 20px;
+  gap: clamp(12px, 3vw, 20px);
   position: relative;
   z-index: 2;
 }
 
 .header-text .title-gradient {
-  font-size: 2.2rem;
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
   font-weight: 800;
   margin-bottom: 8px;
   background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
@@ -466,7 +467,7 @@ export default {
 
 .header-text .subtitle {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 1.1rem;
+  font-size: clamp(0.9rem, 3.5vw, 1.1rem);
   margin: 0;
   font-weight: 500;
 }
@@ -474,19 +475,18 @@ export default {
 .header-right {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: clamp(12px, 3vw, 16px);
   align-items: center;
   justify-content: flex-end;
   width: 100%;
-  max-width: 100%;
 }
 
 .status-display {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(43, 245, 83, 0.15);
-  padding: 10px 16px;
+  gap: 8px;
+  background: rgba(64, 194, 97, 0.15);
+  padding: 8px 12px;
   border-radius: 12px;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(15, 247, 66, 0.2);
@@ -503,7 +503,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 700;
@@ -518,7 +518,7 @@ export default {
 .status-badge.rejected { background: rgba(239, 68, 68, 0.3); }
 
 .edit-btn {
-  background: rgba(183, 31, 104, 0.2);
+  background: rgba(37, 18, 27, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 12px 20px;
@@ -531,6 +531,7 @@ export default {
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
   min-width: 140px;
+  white-space: nowrap;
 }
 
 .edit-btn:hover,
@@ -543,17 +544,34 @@ export default {
 
 /* Main Content Layout */
 .profile-content {
-  display: grid;
-  grid-template-columns: minmax(280px, 320px) 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 0;
   min-height: 500px;
+}
+
+@media (min-width: 769px) {
+  .profile-content {
+    flex-direction: row;
+  }
+
+  .profile-picture-section {
+    border-right: 1px solid #e2e8f0;
+    border-bottom: none;
+  }
 }
 
 /* Profile Picture Section */
 .profile-picture-section {
   background: #4c5055;
   padding: 24px 20px;
-  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+@media (max-width: 768px) {
+  .profile-picture-section {
+    padding: 20px 16px;
+  }
 }
 
 .picture-card {
@@ -606,6 +624,24 @@ export default {
   position: relative;
 }
 
+@media (max-width: 768px) {
+  .profile-picture {
+    width: 140px;
+    height: 140px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-picture {
+    width: 120px;
+    height: 120px;
+  }
+
+  .placeholder {
+    font-size: 2.8rem;
+  }
+}
+
 .profile-picture:hover {
   border-color: #394252;
   box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
@@ -630,7 +666,7 @@ export default {
 .edit-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.8));
+  background: linear-gradient(135deg, rgba(222, 225, 231, 0.8), rgba(130, 148, 223, 0.8));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -696,6 +732,12 @@ export default {
   background-color: #a9b3c2;
 }
 
+@media (max-width: 768px) {
+  .profile-info-section {
+    padding: 20px 16px;
+  }
+}
+
 .info-card {
   background: rgb(252, 252, 253);
   border-radius: 20px;
@@ -715,6 +757,20 @@ export default {
   gap: 12px;
 }
 
+@media (max-width: 768px) {
+  .info-card .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .card-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
 .info-card .card-header h3 {
   margin: 0;
   font-size: 1.2rem;
@@ -729,16 +785,25 @@ export default {
   padding: 24px;
 }
 
+@media (max-width: 768px) {
+  .card-body {
+    padding: 20px;
+  }
+}
+
 /* Form Styles */
 .form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
+@media (min-width: 769px) {
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
 }
 
 .form-group.full-width {
@@ -750,13 +815,13 @@ export default {
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: #5786d0;
+  color: #4468a2;
   margin-bottom: 8px;
   font-size: 0.9rem;
 }
 
 .form-label i {
-  color: #6b7280;
+  color: #2e4a82;
   width: 16px;
   font-size: 0.95rem;
 }
@@ -772,10 +837,22 @@ export default {
   border-radius: 12px;
   font-size: 0.95rem;
   transition: all 0.3s ease;
-  background: #26209d;
+  background: #f7f7f9;
   font-family: inherit;
   width: 100%;
   box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .form-input,
+  .form-textarea {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .form-label {
+    font-size: 0.85rem;
+  }
 }
 
 .form-input:focus,
@@ -836,6 +913,14 @@ export default {
   white-space: nowrap;
 }
 
+@media (max-width: 768px) {
+  .edit-btn,
+  .save-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .save-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
@@ -873,6 +958,13 @@ export default {
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
 }
 
+@media (max-width: 480px) {
+  .category-tag {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+}
+
 .no-categories {
   padding: 16px;
   border: 2px dashed #d1d5db;
@@ -897,6 +989,18 @@ export default {
   border: 1px solid #e0f2fe;
   border-radius: 12px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .certificate-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .certificate-link {
+    align-self: flex-end;
+  }
 }
 
 .certificate-display i.fa-file-pdf {
@@ -1035,130 +1139,23 @@ export default {
   100% { transform: translateX(100%) scale(0.3); opacity: 0; }
 }
 
-/* ===== FULLY RESPONSIVE MOBILE DESIGN ===== */
-@media (max-width: 1024px) {
-  .profile-content {
-    grid-template-columns: 1fr;
-  }
-  
-  .profile-picture-section {
-    border-right: none;
-    border-bottom: 1px solid #e2e8f0;
-  }
-  
-  .profile-picture {
-    width: 160px;
-    height: 160px;
-  }
-  
-  .header-content {
-    padding: 0 8px;
-  }
-}
-
-@media (max-width: 768px) {
-  .profile-header {
-    padding: 20px;
-  }
-  
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  
-  .header-right {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-  
-  .title-gradient {
-    font-size: 1.8rem;
-  }
-  
-  .profile-picture {
-    width: 140px;
-    height: 140px;
-  }
-  
-  .card-body {
-    padding: 20px;
-  }
-  
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .edit-btn,
-  .save-btn {
-    width: 100%;
-    justify-content: center;
-  }
-  
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .card-actions {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-  }
-}
-
+/* Mobile Padding Margin Adjustments */
 @media (max-width: 480px) {
   .profile-section {
     margin: 8px;
     border-radius: 16px;
   }
-  
+
   .profile-header {
     padding: 16px;
   }
-  
+
   .title-gradient {
     font-size: 1.6rem;
   }
-  
+
   .subtitle {
     font-size: 1rem;
-  }
-  
-  .profile-picture {
-    width: 120px;
-    height: 120px;
-  }
-  
-  .placeholder {
-    font-size: 2.8rem;
-  }
-  
-  .form-input,
-  .form-textarea {
-    padding: 10px 12px;
-    font-size: 0.9rem;
-  }
-  
-  .form-label {
-    font-size: 0.85rem;
-  }
-  
-  .category-tag {
-    padding: 5px 10px;
-    font-size: 0.75rem;
-  }
-  
-  .certificate-display {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .certificate-link {
-    align-self: flex-end;
   }
 }
 </style>

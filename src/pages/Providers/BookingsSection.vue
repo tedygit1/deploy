@@ -119,10 +119,10 @@
         </div>
         <div class="stat-card">
           <div class="stat-icon revenue">
-            <i class="fa-solid fa-dollar-sign"></i>
+            <i class="fa-solid fa-money-bill"></i>
           </div>
           <div class="stat-content">
-            <h3>${{ stats.revenue }}</h3>
+            <h3>ETB {{ stats.revenue }}</h3>
             <p>Revenue</p>
           </div>
         </div>
@@ -231,7 +231,8 @@
             :class="{
               'today-card': isTodayBooking(booking),
               'admin-card': booking.isAdminBooking,
-              'completed-card': booking.status === 'completed'
+              'completed-card': booking.status === 'completed',
+              'past-card': isPastBooking(booking)
             }"
           >
             <!-- Card Header with Customer Info -->
@@ -254,12 +255,19 @@
                   <span v-if="booking.customerPhone">
                     <i class="fa-solid fa-phone"></i> {{ booking.customerPhone }}
                   </span>
+                  <span v-if="booking.customerName.includes('CID:')" class="customer-id-badge">
+                    ID: {{ booking.customerName.split('CID:')[1] }}
+                  </span>
                 </p>
               </div>
               
               <div class="booking-status-section">
-                <div class="status-badge" :class="booking.status">
+                <!-- Don't show status for past bookings -->
+                <div v-if="!isPastBooking(booking)" class="status-badge" :class="booking.status">
                   {{ formatStatus(booking.status) }}
+                </div>
+                <div v-else class="past-badge">
+                  Past Booking
                 </div>
                 <div class="booking-id">
                   #{{ booking._id.substring(0, 6) }}
@@ -276,12 +284,13 @@
                 <h5 class="service-name">{{ formatServiceName(booking.serviceName) }}</h5>
                 <div class="service-meta">
                   <span class="service-category">{{ booking.serviceCategory }}</span>
+                  <span v-if="booking.serviceSubcategory" class="service-subcategory">{{ booking.serviceSubcategory }}</span>
                   <span class="service-duration">{{ calculateDuration(booking.startTime, booking.endTime) }} min</span>
                 </div>
               </div>
               <div class="service-amount">
-                <span class="amount-label">Amount</span>
-                <span class="amount-value">${{ getBookingAmount(booking) }}</span>
+                <span class="amount-label">Price</span>
+                <span class="amount-value">ETB {{ booking.actualPrice || booking.servicePrice || booking.amount }}</span>
               </div>
             </div>
             
@@ -325,7 +334,7 @@
             <!-- Action Buttons -->
             <div class="action-buttons-section">
               <button 
-                v-if="booking.status === 'confirmed'"
+                v-if="!isPastBooking(booking) && booking.status === 'confirmed'"
                 class="action-btn mark-complete-btn"
                 @click="completeBooking(booking)"
               >
@@ -384,13 +393,20 @@
                   </div>
                   <div class="customer-details">
                     <span class="customer-email">{{ booking.customerEmail }}</span>
+                    <span v-if="booking.customerName.includes('CID:')" class="customer-id">
+                      ID: {{ booking.customerName.split('CID:')[1] }}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div class="table-cell service-cell">
                 <strong>{{ formatServiceName(booking.serviceName) }}</strong>
-                <span class="service-category">{{ booking.serviceCategory }}</span>
+                <div class="service-meta-row">
+                  <span class="service-category">{{ booking.serviceCategory }}</span>
+                  <span v-if="booking.serviceSubcategory" class="service-subcategory">{{ booking.serviceSubcategory }}</span>
+                  <span class="service-price">ETB {{ booking.actualPrice || booking.servicePrice || booking.amount }}</span>
+                </div>
               </div>
 
               <div class="table-cell datetime-cell">
@@ -414,22 +430,26 @@
               </div>
               
               <div class="table-cell status-cell">
-                <span class="status-badge" :class="booking.status">
+                <!-- Don't show status for past bookings -->
+                <span v-if="!isPastBooking(booking)" class="status-badge" :class="booking.status">
                   {{ formatStatus(booking.status) }}
+                </span>
+                <span v-else class="past-badge">
+                  Past Booking
                 </span>
               </div>
               
               <div class="table-cell amount-cell">
                 <div class="amount-container">
-                  <i class="fa-solid fa-dollar-sign"></i>
-                  <strong>${{ getBookingAmount(booking) }}</strong>
+                  <i class="fa-solid fa-money-bill"></i>
+                  <strong>ETB {{ booking.actualPrice || booking.servicePrice || booking.amount }}</strong>
                 </div>
               </div>
               
               <div class="table-cell actions-cell">
                 <div class="action-buttons">
                   <button 
-                    v-if="booking.status === 'confirmed'"
+                    v-if="!isPastBooking(booking) && booking.status === 'confirmed'"
                     class="btn-action complete"
                     @click="completeBooking(booking)"
                     title="Mark Complete"
@@ -511,23 +531,51 @@
         </div>
         <div class="modal-body">
           <div v-if="selectedBooking" class="booking-details">
-            <h4>Customer Information</h4>
-            <p><strong>Name:</strong> {{ selectedBooking.customerName }}</p>
-            <p><strong>Email:</strong> {{ selectedBooking.customerEmail || 'Not provided' }}</p>
-            <p><strong>Phone:</strong> {{ selectedBooking.customerPhone || 'Not provided' }}</p>
+            <!-- Customer Information Section -->
+            <div class="customer-section">
+              <h4>
+                <i class="fa-solid fa-user"></i>
+                Customer Information
+                <span v-if="loadingCustomerDetails" class="loading-indicator">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+                </span>
+              </h4>
+              <div v-if="customerDetails">
+                <p><strong>Name:</strong> {{ customerDetails.fullname || customerDetails.name || selectedBooking.customerName }}</p>
+                <p v-if="customerDetails.email"><strong>Email:</strong> {{ customerDetails.email }}</p>
+                <p v-if="customerDetails.phone"><strong>Phone:</strong> {{ customerDetails.phone }}</p>
+                <p v-if="customerDetails.address"><strong>Address:</strong> {{ customerDetails.address }}</p>
+                <p v-if="customerDetails.cid"><strong>Customer ID:</strong> {{ customerDetails.cid }}</p>
+              </div>
+              <div v-else-if="loadingCustomerDetails">
+                <p><i class="fa-solid fa-spinner fa-spin"></i> Loading customer details...</p>
+              </div>
+              <div v-else>
+                <p><strong>Name:</strong> {{ selectedBooking.customerName }}</p>
+                <p v-if="selectedBooking.customerEmail"><strong>Email:</strong> {{ selectedBooking.customerEmail }}</p>
+                <p v-if="selectedBooking.customerPhone"><strong>Phone:</strong> {{ selectedBooking.customerPhone }}</p>
+                <p v-if="selectedBooking.customerId"><strong>Customer ID:</strong> {{ selectedBooking.customerId }}</p>
+                <p v-if="selectedBooking.customerName.includes('CID:')">
+                  <strong>Customer Reference:</strong> {{ selectedBooking.customerName }}
+                </p>
+              </div>
+            </div>
             
             <h4>Service Details</h4>
             <p><strong>Service:</strong> {{ selectedBooking.serviceName }}</p>
-            <p><strong>Category:</strong> {{ selectedBooking.serviceCategory }}</p>
-            <p><strong>Amount:</strong> ${{ selectedBooking.amount }}</p>
+            <p v-if="selectedBooking.serviceCategory"><strong>Category:</strong> {{ selectedBooking.serviceCategory }}</p>
+            <p v-if="selectedBooking.serviceSubcategory"><strong>Subcategory:</strong> {{ selectedBooking.serviceSubcategory }}</p>
+            <p><strong>Amount:</strong> ETB {{ selectedBooking.actualPrice || selectedBooking.servicePrice || selectedBooking.amount }}</p>
+            <p v-if="selectedBooking.serviceId"><strong>Service ID:</strong> {{ selectedBooking.serviceId }}</p>
             
             <h4>Timing</h4>
             <p><strong>Date:</strong> {{ formatCleanDate(selectedBooking.bookingDate) }}</p>
-            <p><strong>Time:</strong> {{ selectedBooking.startTime }} - {{ selectedBooking.endTime }}</p>
+            <p><strong>Time:</strong> {{ formatTimeSlot(selectedBooking.startTime, selectedBooking.endTime) }}</p>
             <p><strong>Duration:</strong> {{ calculateDuration(selectedBooking.startTime, selectedBooking.endTime) }} minutes</p>
             
             <h4>Status</h4>
-            <p><strong>Current Status:</strong> {{ formatStatus(selectedBooking.status) }}</p>
+            <!-- Don't show status for past bookings -->
+            <p v-if="!isPastBooking(selectedBooking)"><strong>Current Status:</strong> {{ formatStatus(selectedBooking.status) }}</p>
             <p><strong>Booked:</strong> {{ formatRelativeTime(selectedBooking.createdAt) }}</p>
             
             <div class="modal-actions">
@@ -565,6 +613,15 @@ export default {
     const showDebug = ref(false);
     const lastUpdatedTime = ref("");
     
+    // Service details cache
+    const serviceDetailsCache = ref({});
+    const servicesMap = ref({}); // Map of service ID to service details
+    
+    // Customer details state
+    const customerDetails = ref(null);
+    const loadingCustomerDetails = ref(false);
+    const customerDetailsError = ref("");
+    
     // Debug info
     const debugProviderId = ref("");
     const debugHasToken = ref(false);
@@ -573,9 +630,9 @@ export default {
     
     // Timeline periods
     const timelinePeriods = ref([
-      { id: "all", label: "All Future", icon: "fa-solid fa-calendar" },
-      { id: "past", label: "Past", icon: "fa-solid fa-calendar-minus" },
-      { id: "today", label: "Today", icon: "fa-solid fa-calendar-day" },
+      { id: "all", label: "All Bookings", icon: "fa-solid fa-calendar" },
+      { id: "past", label: "Past Bookings", icon: "fa-solid fa-calendar-minus" },
+      { id: "today", label: "Today's Bookings", icon: "fa-solid fa-calendar-day" },
       { id: "tomorrow", label: "Tomorrow", icon: "fa-solid fa-calendar-plus" },
       { id: "next5days", label: "Next 5 Days", icon: "fa-solid fa-calendar-week" }
     ]);
@@ -589,181 +646,34 @@ export default {
       revenue: 0
     });
 
-    // ==================== IMPROVED: Get Provider ID ====================
-    const getProviderId = () => {
-      console.log("🔍 Getting provider ID for bookings...");
-      
-      // Check multiple possible locations for provider ID
-      const possibleSources = [
-        // 1. Direct from localStorage
-        () => {
-          const providerId = localStorage.getItem('providerId');
-          console.log("🔍 Checking localStorage.providerId:", providerId);
-          return providerId;
-        },
-        
-        // 2. From loggedProvider in localStorage
-        () => {
-          const loggedProvider = localStorage.getItem('loggedProvider');
-          if (loggedProvider) {
-            try {
-              const parsed = JSON.parse(loggedProvider);
-              console.log("🔍 Checking loggedProvider:", parsed);
-              return parsed.pid || parsed.providerId || parsed._id || parsed.id;
-            } catch (e) {
-              console.warn("❌ Failed to parse loggedProvider:", e);
-            }
-          }
-          return null;
-        },
-        
-        // 3. From providerProfile in localStorage
-        () => {
-          const providerProfile = localStorage.getItem('providerProfile');
-          if (providerProfile) {
-            try {
-              const parsed = JSON.parse(providerProfile);
-              console.log("🔍 Checking providerProfile:", parsed);
-              return parsed.pid || parsed._id || parsed.id;
-            } catch (e) {
-              console.warn("❌ Failed to parse providerProfile:", e);
-            }
-          }
-          return null;
-        },
-        
-        // 4. Check for token to verify authentication
-        () => {
-          const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
-          if (token) {
-            console.log("✅ Token exists, trying to fetch user profile...");
-            debugHasToken.value = true;
-            return null; // Will fetch from API
-          }
-          return null;
-        }
-      ];
-      
-      // Try each source in order
-      for (const source of possibleSources) {
-        const providerId = source();
-        if (providerId) {
-          console.log("✅ Found provider ID:", providerId);
-          debugProviderId.value = providerId;
-          return providerId;
-        }
-      }
-      
-      console.warn("❌ No provider ID found locally");
-      return null;
-    };
-
-    // ==================== IMPROVED: Load Bookings Function ====================
-    const loadBookings = async () => {
-      console.log("🚀 Starting bookings load...");
-      
-      loading.value = true;
-      loadingProgress.value = 0;
-      error.value = "";
-      debugProviderId.value = "";
-      debugHasToken.value = false;
-      debugApiEndpoint.value = "";
+    // ==================== NEW: TIME FORMAT CONVERSION ====================
+    const convertTo12HourFormat = (time24) => {
+      if (!time24) return '';
       
       try {
-        // Get provider ID
-        let providerId = getProviderId();
-        debugProviderId.value = providerId || "Not found";
+        // Handle times like "09:00", "09:00:00", "9:00"
+        let [hours, minutes] = time24.split(':');
+        hours = parseInt(hours, 10);
+        minutes = minutes ? parseInt(minutes, 10) : 0;
         
-        // If no provider ID found, try to get it from API
-        if (!providerId) {
-          console.log("🔄 No provider ID found locally, trying to fetch from API...");
-          try {
-            const userResponse = await http.get('/users/profile');
-            const userData = userResponse.data;
-            console.log("👤 User profile data:", userData);
-            
-            // Extract provider ID from user data
-            providerId = userData.providerId || userData.pid || userData._id || userData.id;
-            
-            if (providerId) {
-              console.log("✅ Got provider ID from API:", providerId);
-              debugProviderId.value = providerId;
-              // Save it for future use
-              localStorage.setItem('providerId', providerId);
-            } else {
-              throw new Error("No provider ID in user profile");
-            }
-          } catch (apiErr) {
-            console.error("❌ Failed to fetch user profile:", apiErr);
-            error.value = "Unable to authenticate. Please login again.";
-            loading.value = false;
-            return;
-          }
-        }
+        if (isNaN(hours) || isNaN(minutes)) return time24;
         
-        // Update progress
-        loadingProgress.value = 30;
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hours12 = hours % 12 || 12;
+        const minutesStr = minutes < 10 ? `0${minutes}` : minutes;
         
-        // Try multiple API endpoints
-        const bookingEndpoints = [
-          `/infinity-booking/bookings/provider/${providerId}`,
-          `/bookings/provider/${providerId}`,
-          `/bookings?providerId=${providerId}`,
-          `/infinity-booking/bookings/stats/provider/${providerId}`
-        ];
-        
-        let bookingsData = null;
-        let successfulEndpoint = "";
-        
-        for (const endpoint of bookingEndpoints) {
-          try {
-            console.log(`📡 Trying endpoint: ${endpoint}`);
-            debugApiEndpoint.value = endpoint;
-            const response = await http.get(endpoint);
-            console.log("📦 API Response:", response);
-            
-            if (response.data && (Array.isArray(response.data) || response.data.bookings || response.data.data)) {
-              bookingsData = response.data;
-              successfulEndpoint = endpoint;
-              break;
-            }
-          } catch (endpointError) {
-            console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
-          }
-        }
-        
-        loadingProgress.value = 70;
-        
-        if (!bookingsData) {
-          throw new Error("No bookings data found from any endpoint");
-        }
-        
-        console.log(`✅ Successfully loaded from: ${successfulEndpoint}`);
-        
-        // Process the bookings data
-        bookings.value = processBookings(bookingsData);
-        calculateStats();
-        
-        loadingProgress.value = 100;
-        lastUpdatedTime.value = new Date().toLocaleTimeString();
-        
-        console.log(`✅ Loaded ${bookings.value.length} bookings`);
-        
+        return `${hours12}:${minutesStr} ${ampm}`;
       } catch (err) {
-        console.error("❌ Load Error:", err);
-        error.value = err.response?.data?.message || err.message || "Failed to load bookings";
-        
-        // Store debug info
-        debugLocalStorageKeys.value = Array.from({length: localStorage.length}, (_, i) => 
-          localStorage.key(i)
-        ).join(", ");
-        
-        bookings.value = [];
-        calculateStats();
-      } finally {
-        loading.value = false;
-        setTimeout(() => { loadingProgress.value = 0; }, 500);
+        console.error("Error converting time:", err, time24);
+        return time24;
       }
+    };
+
+    const formatTimeSlot = (startTime, endTime) => {
+      if (!startTime || !endTime) return 'No time';
+      const formattedStart = convertTo12HourFormat(startTime);
+      const formattedEnd = convertTo12HourFormat(endTime);
+      return `${formattedStart} - ${formattedEnd}`;
     };
 
     // ==================== DATE HELPER FUNCTIONS ====================
@@ -780,18 +690,11 @@ export default {
       return tomorrow;
     };
 
-    const getDayAfterTomorrowStart = () => {
-      const dayAfterTomorrow = new Date();
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-      dayAfterTomorrow.setHours(0, 0, 0, 0);
-      return dayAfterTomorrow;
-    };
-
-    const getNext6DaysEnd = () => {
-      const next6Days = new Date();
-      next6Days.setDate(next6Days.getDate() + 7);
-      next6Days.setHours(23, 59, 59, 999);
-      return next6Days;
+    const getNextDayStart = (daysAhead) => {
+      const date = new Date();
+      date.setDate(date.getDate() + daysAhead);
+      date.setHours(0, 0, 0, 0);
+      return date;
     };
 
     const isPastBooking = (booking) => {
@@ -824,8 +727,8 @@ export default {
       try {
         const bookingDate = new Date(booking.bookingDate);
         const tomorrowStart = getTomorrowStart();
-        const dayAfterTomorrowStart = getDayAfterTomorrowStart();
-        return bookingDate >= tomorrowStart && bookingDate < dayAfterTomorrowStart;
+        const dayAfterTomorrow = getNextDayStart(2);
+        return bookingDate >= tomorrowStart && bookingDate < dayAfterTomorrow;
       } catch (err) {
         console.error("Error checking tomorrow booking:", err);
         return false;
@@ -836,19 +739,772 @@ export default {
       if (!booking || !booking.bookingDate) return false;
       try {
         const bookingDate = new Date(booking.bookingDate);
-        const dayAfterTomorrowStart = getDayAfterTomorrowStart();
-        const next6DaysEnd = getNext6DaysEnd();
-        return bookingDate >= dayAfterTomorrowStart && bookingDate <= next6DaysEnd;
+        const todayStart = getTodayStart();
+        const fiveDaysFromNow = getNextDayStart(5);
+        return bookingDate >= todayStart && bookingDate < fiveDaysFromNow;
       } catch (err) {
         console.error("Error checking next 5 days booking:", err);
         return false;
       }
     };
 
+    // ==================== FETCH ALL SERVICES FOR PROVIDER ====================
+    const fetchAllServices = async (providerId) => {
+      if (!providerId) {
+        console.warn("❌ No provider ID for fetching services");
+        return;
+      }
+      
+      console.log("🛠️ Fetching all services for provider:", providerId);
+      
+      try {
+        // Try different endpoints for bulk service data
+        const serviceEndpoints = [
+          `/services?provider=${providerId}`,
+          `/services/provider/${providerId}`,
+          `/provider/services/${providerId}`,
+          `/api/services?providerId=${providerId}`
+        ];
+        
+        let servicesData = null;
+        
+        for (const endpoint of serviceEndpoints) {
+          try {
+            console.log(`📡 Trying services endpoint: ${endpoint}`);
+            const response = await http.get(endpoint);
+            console.log("🛠️ Services API Response:", response.data);
+            
+            if (response.data) {
+              servicesData = response.data;
+              console.log(`✅ Found services from endpoint: ${endpoint}`);
+              break;
+            }
+          } catch (endpointError) {
+            console.log(`❌ Services endpoint ${endpoint} failed:`, endpointError.message);
+          }
+        }
+        
+        if (servicesData) {
+          // Extract services array
+          let servicesArray = [];
+          if (Array.isArray(servicesData)) {
+            servicesArray = servicesData;
+          } else if (servicesData.services && Array.isArray(servicesData.services)) {
+            servicesArray = servicesData.services;
+          } else if (servicesData.data && Array.isArray(servicesData.data)) {
+            servicesArray = servicesData.data;
+          }
+          
+          console.log(`📊 Extracted ${servicesArray.length} services`);
+          
+          // Process each service
+          servicesMap.value = {};
+          servicesArray.forEach(service => {
+            try {
+              const serviceId = service._id || service.id || service.serviceId;
+              if (serviceId) {
+                // FIXED: Extract service data with proper field mapping
+                const serviceDetails = extractServiceDetails(service);
+                servicesMap.value[serviceId] = serviceDetails;
+                serviceDetailsCache.value[serviceId] = serviceDetails;
+                
+                console.log(`✅ Cached service ${serviceId}:`, {
+                  name: serviceDetails.name,
+                  category: serviceDetails.category,
+                  price: serviceDetails.price,
+                  subcategory: serviceDetails.subcategory
+                });
+              }
+            } catch (err) {
+              console.error(`❌ Error processing service:`, err, service);
+            }
+          });
+          
+          console.log(`✅ Loaded ${Object.keys(servicesMap.value).length} services into cache`);
+          
+        } else {
+          console.warn("⚠️ No bulk services data found - will fetch individually");
+        }
+        
+      } catch (err) {
+        console.error("❌ Error in fetchAllServices:", err);
+      }
+    };
+
+    // ==================== EXTRACT SERVICE DETAILS ====================
+    const extractServiceDetails = (serviceData) => {
+      console.log("🔍 Raw service data for extraction:", serviceData);
+      
+      // Try to extract from different possible field structures
+      const serviceId = serviceData._id || serviceData.id || serviceData.serviceId;
+      
+      // Extract name from multiple possible fields
+      let serviceName = serviceData.title || serviceData.name || serviceData.serviceName || 'Service';
+      
+      // Extract category - check multiple possible locations
+      let serviceCategory = 'General';
+      if (serviceData.categoryName) {
+        serviceCategory = serviceData.categoryName;
+      } else if (serviceData.category) {
+        serviceCategory = serviceData.category;
+      } else if (serviceData.serviceCategory) {
+        serviceCategory = serviceData.serviceCategory;
+      } else if (serviceData.categoryId && typeof serviceData.categoryId === 'object') {
+        serviceCategory = serviceData.categoryId.name || 'General';
+      }
+      
+      // Extract subcategory
+      let serviceSubcategory = '';
+      if (serviceData.subcategoryIds && Array.isArray(serviceData.subcategoryIds)) {
+        serviceSubcategory = serviceData.subcategoryIds.join(', ');
+      } else if (serviceData.subcategory) {
+        serviceSubcategory = serviceData.subcategory;
+      } else if (serviceData.serviceSubcategory) {
+        serviceSubcategory = serviceData.serviceSubcategory;
+      }
+      
+      // Extract price - check multiple possible fields
+      let servicePrice = 0;
+      if (serviceData.bookingPrice !== undefined) {
+        servicePrice = parseFloat(serviceData.bookingPrice);
+      } else if (serviceData.totalPrice !== undefined) {
+        servicePrice = parseFloat(serviceData.totalPrice);
+      } else if (serviceData.price !== undefined) {
+        servicePrice = parseFloat(serviceData.price);
+      } else if (serviceData.amount !== undefined) {
+        servicePrice = parseFloat(serviceData.amount);
+      } else if (serviceData.servicePrice !== undefined) {
+        servicePrice = parseFloat(serviceData.servicePrice);
+      }
+      
+      console.log(`📊 Extracted service details for ${serviceId}:`, {
+        name: serviceName,
+        category: serviceCategory,
+        subcategory: serviceSubcategory,
+        price: servicePrice
+      });
+      
+      return {
+        id: serviceId,
+        name: serviceName,
+        category: serviceCategory,
+        subcategory: serviceSubcategory,
+        price: servicePrice,
+        description: serviceData.description || '',
+        serviceType: serviceData.serviceType || 'fixed',
+        providerId: serviceData.providerId || serviceData.provider?._id || '',
+        status: serviceData.status || 'published',
+        rawData: serviceData // Keep raw data for debugging
+      };
+    };
+
+    // ==================== GET SERVICE DETAILS ====================
+    const getServiceDetails = (serviceId) => {
+      if (!serviceId) {
+        return null;
+      }
+      
+      // Check cache first
+      if (serviceDetailsCache.value[serviceId]) {
+        console.log(`✅ Using cached service details for: ${serviceId}`);
+        return serviceDetailsCache.value[serviceId];
+      }
+      
+      // Check services map
+      if (servicesMap.value[serviceId]) {
+        serviceDetailsCache.value[serviceId] = servicesMap.value[serviceId];
+        return servicesMap.value[serviceId];
+      }
+      
+      return null;
+    };
+
+    // ==================== FETCH SERVICE DETAILS FROM API ====================
+    const fetchServiceDetailsFromApi = async (serviceId) => {
+      if (!serviceId) {
+        return null;
+      }
+      
+      console.log("🔍 Fetching service details from API for:", serviceId);
+      
+      try {
+        // Try endpoints that work based on logs
+        const serviceEndpoints = [
+          `/services/${serviceId}`,  // This works
+          `/service/${serviceId}`,
+          `/api/services/${serviceId}`
+        ];
+        
+        let serviceData = null;
+        
+        for (const endpoint of serviceEndpoints) {
+          try {
+            console.log(`📡 Trying service endpoint: ${endpoint}`);
+            const response = await http.get(endpoint);
+            console.log("🛠️ Service API Response data:", response.data);
+            
+            if (response.data) {
+              serviceData = response.data;
+              console.log("✅ Found service data from endpoint:", endpoint);
+              break;
+            }
+          } catch (endpointError) {
+            console.log(`❌ Service endpoint ${endpoint} failed:`, endpointError.message);
+          }
+        }
+        
+        if (serviceData) {
+          // Extract service details using our helper function
+          const processedService = extractServiceDetails(serviceData);
+          console.log("🛠️ Extracted service details:", processedService);
+          
+          // Cache the result
+          serviceDetailsCache.value[serviceId] = processedService;
+          servicesMap.value[serviceId] = processedService;
+          
+          return processedService;
+        } else {
+          console.warn("⚠️ No service data found from any endpoint for:", serviceId);
+          return null;
+        }
+        
+      } catch (err) {
+        console.error("❌ Error fetching service details:", err);
+        return null;
+      }
+    };
+
+    // ==================== GET PROVIDER ID ====================
+    const getProviderId = () => {
+      console.log("🔍 Getting provider ID for bookings...");
+      
+      // Check multiple possible locations for provider ID
+      const possibleSources = [
+        () => {
+          const providerId = localStorage.getItem('providerId');
+          console.log("🔍 Checking localStorage.providerId:", providerId);
+          return providerId;
+        },
+        
+        () => {
+          const loggedProvider = localStorage.getItem('loggedProvider');
+          if (loggedProvider) {
+            try {
+              const parsed = JSON.parse(loggedProvider);
+              console.log("🔍 Checking loggedProvider:", parsed);
+              return parsed.pid || parsed.providerId || parsed._id || parsed.id;
+            } catch (e) {
+              console.warn("❌ Failed to parse loggedProvider:", e);
+            }
+          }
+          return null;
+        },
+        
+        () => {
+          const providerProfile = localStorage.getItem('providerProfile');
+          if (providerProfile) {
+            try {
+              const parsed = JSON.parse(providerProfile);
+              console.log("🔍 Checking providerProfile:", parsed);
+              return parsed.pid || parsed._id || parsed.id;
+            } catch (e) {
+              console.warn("❌ Failed to parse providerProfile:", e);
+            }
+          }
+          return null;
+        },
+        
+        () => {
+          const token = localStorage.getItem("provider_token") || localStorage.getItem("token");
+          if (token) {
+            console.log("✅ Token exists");
+            debugHasToken.value = true;
+            return null;
+          }
+          return null;
+        }
+      ];
+      
+      // Try each source in order
+      for (const source of possibleSources) {
+        const providerId = source();
+        if (providerId) {
+          console.log("✅ Found provider ID:", providerId);
+          debugProviderId.value = providerId;
+          return providerId;
+        }
+      }
+      
+      console.warn("❌ No provider ID found locally");
+      return null;
+    };
+
+    // ==================== LOAD BOOKINGS FUNCTION ====================
+    const loadBookings = async () => {
+      console.log("🚀 Starting bookings load...");
+      
+      loading.value = true;
+      loadingProgress.value = 0;
+      error.value = "";
+      debugProviderId.value = "";
+      debugHasToken.value = false;
+      debugApiEndpoint.value = "";
+      serviceDetailsCache.value = {};
+      
+      try {
+        // Get provider ID
+        let providerId = getProviderId();
+        debugProviderId.value = providerId || "Not found";
+        
+        if (!providerId) {
+          console.log("🔄 No provider ID found locally, trying to fetch from API...");
+          try {
+            const userResponse = await http.get('/users/profile');
+            const userData = userResponse.data;
+            console.log("👤 User profile data:", userData);
+            
+            providerId = userData.providerId || userData.pid || userData._id || userData.id;
+            
+            if (providerId) {
+              console.log("✅ Got provider ID from API:", providerId);
+              debugProviderId.value = providerId;
+              localStorage.setItem('providerId', providerId);
+            } else {
+              throw new Error("No provider ID in user profile");
+            }
+          } catch (apiErr) {
+            console.error("❌ Failed to fetch user profile:", apiErr);
+            error.value = "Unable to authenticate. Please login again.";
+            loading.value = false;
+            return;
+          }
+        }
+        
+        loadingProgress.value = 30;
+        
+        // Try to fetch all services in background
+        console.log("🔄 Starting services fetch in background...");
+        fetchAllServices(providerId).then(() => {
+          console.log("✅ Background services fetch completed");
+        }).catch(err => {
+          console.log("⚠️ Background services fetch failed:", err);
+        });
+        
+        loadingProgress.value = 50;
+        
+        // Fetch bookings
+        const bookingEndpoints = [
+          `/bookings/provider/${providerId}`,
+          `/bookings?providerId=${providerId}`,
+          `/api/bookings/provider/${providerId}`
+        ];
+        
+        let bookingsData = null;
+        
+        for (const endpoint of bookingEndpoints) {
+          try {
+            console.log(`📡 Trying bookings endpoint: ${endpoint}`);
+            debugApiEndpoint.value = endpoint;
+            const response = await http.get(endpoint);
+            console.log("📦 Bookings API Response:", response.data);
+            
+            if (response.data && (Array.isArray(response.data) || response.data.bookings || response.data.data)) {
+              bookingsData = response.data;
+              console.log("✅ Bookings data found from endpoint:", endpoint);
+              break;
+            }
+          } catch (endpointError) {
+            console.log(`❌ Bookings endpoint ${endpoint} failed:`, endpointError.message);
+          }
+        }
+        
+        loadingProgress.value = 70;
+        
+        if (!bookingsData) {
+          throw new Error("No bookings data found from any endpoint");
+        }
+        
+        // Process the bookings data
+        bookings.value = await processBookings(bookingsData);
+        calculateStats();
+        
+        loadingProgress.value = 100;
+        lastUpdatedTime.value = new Date().toLocaleTimeString();
+        
+        console.log(`✅ Loaded ${bookings.value.length} bookings`);
+        
+      } catch (err) {
+        console.error("❌ Load Error:", err);
+        error.value = err.response?.data?.message || err.message || "Failed to load bookings";
+        
+        debugLocalStorageKeys.value = Array.from({length: localStorage.length}, (_, i) => 
+          localStorage.key(i)
+        ).join(", ");
+        
+        bookings.value = [];
+        calculateStats();
+      } finally {
+        loading.value = false;
+        setTimeout(() => { loadingProgress.value = 0; }, 500);
+      }
+    };
+
+    // ==================== PROCESS BOOKINGS ====================
+    const processBookings = async (apiBookings) => {
+      if (!apiBookings) return [];
+      
+      let bookingsArray = [];
+      
+      // Handle different response structures
+      if (Array.isArray(apiBookings)) {
+        bookingsArray = apiBookings;
+      } else if (apiBookings.bookings && Array.isArray(apiBookings.bookings)) {
+        bookingsArray = apiBookings.bookings;
+      } else if (apiBookings.data && Array.isArray(apiBookings.data)) {
+        bookingsArray = apiBookings.data;
+      } else {
+        console.warn("❌ Unexpected API response structure:", apiBookings);
+        return [];
+      }
+
+      const processedBookings = [];
+      
+      // Process bookings in batches
+      const batchSize = 5;
+      for (let i = 0; i < bookingsArray.length; i += batchSize) {
+        const batch = bookingsArray.slice(i, i + batchSize);
+        const batchPromises = batch.map(booking => processSingleBooking(booking));
+        const batchResults = await Promise.allSettled(batchPromises);
+        
+        batchResults.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+            processedBookings.push(result.value);
+          }
+        });
+      }
+
+      console.log(`✅ Processed ${processedBookings.length} bookings`);
+      
+      // Log sample booking with service details
+      if (processedBookings.length > 0) {
+        console.log("📊 Sample booking with service details:", {
+          serviceId: processedBookings[0].serviceId,
+          serviceName: processedBookings[0].serviceName,
+          serviceCategory: processedBookings[0].serviceCategory,
+          servicePrice: processedBookings[0].servicePrice,
+          actualPrice: processedBookings[0].actualPrice,
+          rawServiceData: processedBookings[0].rawServiceData
+        });
+      }
+
+      // Sort by booking date (newest first)
+      processedBookings.sort((a, b) => {
+        const dateA = a.bookingDate ? new Date(a.bookingDate) : new Date();
+        const dateB = b.bookingDate ? new Date(b.bookingDate) : new Date();
+        return dateB - dateA;
+      });
+
+      return processedBookings;
+    };
+
+    // ==================== PROCESS SINGLE BOOKING ====================
+    const processSingleBooking = async (booking) => {
+      try {
+        const originalBooking = booking;
+        const isAdminBooking = booking.createdBy === 'admin' || booking.adminId || booking.isAdminBooking;
+        
+        // Extract customer information
+        const customer = booking.customer || {};
+        
+        // Get customer ID (CID)
+        const customerId = customer.cid || 
+                          customer._id || 
+                          booking.customerId || 
+                          booking.customerId?._id ||
+                          booking.customerId?.cid;
+        
+        // ==================== FIX 1: ADMIN/CUSTOMER DISPLAY LOGIC ====================
+        // Get customer name
+        let customerName = '';
+        if (isAdminBooking) {
+            const admin = booking.adminDetails || {};
+            // For admin bookings, use the admin's name without prepending "Admin"
+            customerName = admin.fullname || admin.name || admin.username || '';
+            
+            // If no admin name found, use a generic name but DON'T prepend "Admin"
+            if (!customerName) {
+                customerName = 'Booking';
+            }
+        } else {
+            if (customer.fullname) {
+                customerName = customer.fullname;
+            } else if (customer.name) {
+                customerName = customer.name;
+            } else if (customer.firstName || customer.lastName) {
+                customerName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+            } else if (booking.customerName) {
+                customerName = booking.customerName;
+            } else if (customerId) {
+                customerName = `Customer CID:${customerId.substring(0, 8)}`;
+            } else {
+                customerName = 'Customer';
+            }
+        }
+        
+        // Clean up name
+        customerName = customerName
+          .replace(/Admin confirmed/gi, '')
+          .replace(/aqssss+/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Get customer email
+        let customerEmail = '';
+        if (isAdminBooking) {
+          const admin = booking.adminDetails || {};
+          customerEmail = admin.email || booking.adminEmail || '';
+        } else {
+          customerEmail = customer.email || booking.customerEmail || '';
+        }
+        
+        // Get customer phone
+        let customerPhone = '';
+        if (isAdminBooking) {
+          const admin = booking.adminDetails || {};
+          customerPhone = admin.phone || admin.phonenumber || booking.adminPhone || '';
+        } else {
+          customerPhone = customer.phone || customer.phonenumber || booking.customerPhone || '';
+        }
+        
+        // Get service information
+        const service = booking.service || {};
+        const serviceId = service._id || booking.serviceId || booking.service?._id || service.serviceId;
+        
+        let serviceName = 'Service';
+        let serviceCategory = 'General';
+        let serviceSubcategory = '';
+        let servicePrice = 0;
+        let actualPrice = 0;
+        let rawServiceData = null;
+        
+        // Get service details if we have serviceId
+        if (serviceId) {
+          // Check cache first
+          let serviceDetails = getServiceDetails(serviceId);
+          
+          // If not in cache, try to fetch from API
+          if (!serviceDetails) {
+            console.log(`🔍 Service ${serviceId} not in cache, fetching from API...`);
+            serviceDetails = await fetchServiceDetailsFromApi(serviceId);
+          }
+          
+          if (serviceDetails) {
+            serviceName = serviceDetails.name;
+            serviceCategory = serviceDetails.category;
+            serviceSubcategory = serviceDetails.subcategory;
+            servicePrice = serviceDetails.price;
+            actualPrice = serviceDetails.price;
+            rawServiceData = serviceDetails.rawData;
+            
+            console.log(`✅ Service details for ${serviceId}:`, {
+              name: serviceName,
+              category: serviceCategory,
+              subcategory: serviceSubcategory,
+              price: servicePrice
+            });
+          } else {
+            console.log(`⚠️ No service details found for ${serviceId}, using booking data`);
+          }
+        }
+        
+        // Fallback to booking data
+        if (serviceName === 'Service') {
+          if (service.title) {
+            serviceName = service.title;
+          } else if (service.name) {
+            serviceName = service.name;
+          } else if (booking.serviceName) {
+            serviceName = booking.serviceName;
+          }
+        }
+        
+        // Clean up service name
+        serviceName = serviceName
+          .replace(/aqssss+/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Get booking date
+        let bookingDate = '';
+        if (booking.bookingDate) {
+          bookingDate = booking.bookingDate;
+        } else if (booking.date) {
+          bookingDate = booking.date;
+        } else if (booking.appointmentDate) {
+          bookingDate = booking.appointmentDate;
+        }
+        
+        // Get times
+        let startTime = booking.startTime || booking.time || booking.start || '09:00';
+        let endTime = booking.endTime || booking.end || '11:00';
+        
+        // Get amount
+        let amount = 0;
+        if (booking.totalPrice !== undefined) {
+          amount = parseFloat(booking.totalPrice);
+        } else if (booking.amount !== undefined) {
+          amount = parseFloat(booking.amount);
+        } else if (booking.price !== undefined) {
+          amount = parseFloat(booking.price);
+        }
+        
+        // Use booking amount if service price is 0
+        if (actualPrice === 0 && amount > 0) {
+          actualPrice = amount;
+        }
+        
+        // Get status
+        let status = 'pending';
+        if (booking.status) {
+          status = booking.status.toLowerCase();
+        }
+        
+        // Get created date
+        let createdAt = new Date().toISOString();
+        if (booking.createdAt) {
+          createdAt = booking.createdAt;
+        } else if (booking.createdDate) {
+          createdAt = booking.createdDate;
+        }
+
+        return {
+          _id: booking._id || booking.bookingId || booking.id || `booking-${Date.now()}-${Math.random()}`,
+          customerId: customerId,
+          customerName: customerName,
+          customerEmail: customerEmail,
+          customerPhone: customerPhone,
+          isAdminBooking: isAdminBooking,
+          serviceId: serviceId,
+          serviceName: serviceName,
+          serviceCategory: serviceCategory,
+          serviceSubcategory: serviceSubcategory,
+          servicePrice: servicePrice ? servicePrice.toFixed(2) : amount.toFixed(2),
+          actualPrice: actualPrice ? actualPrice.toFixed(2) : amount.toFixed(2),
+          bookingDate: bookingDate,
+          startTime: startTime,
+          endTime: endTime,
+          status: status,
+          amount: amount.toFixed(2),
+          createdAt: createdAt,
+          originalData: originalBooking,
+          rawServiceData: rawServiceData,
+          customerDetails: isAdminBooking ? booking.adminDetails : customer
+        };
+        
+      } catch (err) {
+        console.error("❌ Error processing booking:", err, booking);
+        return null;
+      }
+    };
+
+    // ==================== FETCH CUSTOMER DETAILS ====================
+    const fetchCustomerDetails = async (booking) => {
+      if (!booking) {
+        console.warn("❌ No booking provided");
+        return;
+      }
+      
+      console.log("👤 Fetching customer details for booking:", booking._id);
+      console.log("📊 Booking data for customer lookup:", {
+        customerId: booking.customerId,
+        customerName: booking.customerName,
+        originalData: booking.originalData
+      });
+      
+      loadingCustomerDetails.value = true;
+      customerDetailsError.value = "";
+      customerDetails.value = null;
+      
+      try {
+        // First, check if we already have customer details in the booking
+        if (booking.customerDetails) {
+          console.log("✅ Using customer details from booking:", booking.customerDetails);
+          customerDetails.value = booking.customerDetails;
+          return;
+        }
+        
+        // Get customer ID from multiple possible locations
+        const customerId = booking.customerId || 
+                          booking.originalData?.customerId ||
+                          booking.originalData?.customer?._id ||
+                          booking.originalData?.customer?.cid ||
+                          booking.originalData?.customerId?._id ||
+                          booking.originalData?.customerId?.cid;
+        
+        console.log("🔍 Customer ID extracted:", customerId);
+        
+        if (!customerId) {
+          console.warn("⚠️ No customer ID found in booking");
+          customerDetailsError.value = "Customer details not available";
+          return;
+        }
+        
+        // Try multiple endpoints for customer details
+        const customerEndpoints = [
+          `/customers/${customerId}`,
+          `/users/${customerId}`,
+          `/users/profile/${customerId}`,
+          `/api/customers/${customerId}`
+        ];
+        
+        let customerData = null;
+        
+        for (const endpoint of customerEndpoints) {
+          try {
+            console.log(`📡 Trying customer endpoint: ${endpoint}`);
+            const response = await http.get(endpoint);
+            console.log("👤 Customer API Response:", response.data);
+            
+            if (response.data) {
+              customerData = response.data;
+              console.log("✅ Found customer data from endpoint:", endpoint);
+              break;
+            }
+          } catch (endpointError) {
+            console.log(`Customer endpoint ${endpoint} failed:`, endpointError.message);
+          }
+        }
+        
+        if (customerData) {
+          // Process customer data
+          customerDetails.value = {
+            id: customerData._id || customerData.id,
+            cid: customerData.cid || customerData._id,
+            fullname: customerData.fullname || customerData.name || customerData.username || '',
+            email: customerData.email || '',
+            phone: customerData.phone || customerData.phoneNumber || customerData.phonenumber || '',
+            address: customerData.address || customerData.location || '',
+            profilePicture: customerData.profilePicture || customerData.avatar || ''
+          };
+          
+          console.log("✅ Processed customer details:", customerDetails.value);
+        } else {
+          console.warn("⚠️ No customer data found from any endpoint");
+          customerDetailsError.value = "Customer details not available";
+        }
+        
+      } catch (err) {
+        console.error("❌ Error fetching customer details:", err);
+        customerDetailsError.value = err.message || "Failed to load customer details";
+      } finally {
+        loadingCustomerDetails.value = false;
+      }
+    };
+
     // ==================== FILTERING ====================
     const timelineFilteredBookings = computed(() => {
       if (selectedPeriod.value === "all") {
-        return bookings.value.filter(booking => !isPastBooking(booking));
+        return bookings.value;
       }
 
       return bookings.value.filter(booking => {
@@ -895,77 +1551,14 @@ export default {
     });
     const totalPages = computed(() => Math.ceil(displayBookings.value.length / itemsPerPage.value));
 
-    // ==================== DATA PROCESSING ====================
-    const processBookings = (apiBookings) => {
-      if (!apiBookings) return [];
-      
-      let bookingsArray = [];
-      
-      // Handle different response structures
-      if (Array.isArray(apiBookings)) {
-        bookingsArray = apiBookings;
-      } else if (apiBookings.bookings && Array.isArray(apiBookings.bookings)) {
-        bookingsArray = apiBookings.bookings;
-      } else if (apiBookings.data && Array.isArray(apiBookings.data)) {
-        bookingsArray = apiBookings.data;
-      } else {
-        console.warn("❌ Unexpected API response structure:", apiBookings);
-        return [];
-      }
-
-      const processedBookings = bookingsArray.map(booking => {
-        const isAdminBooking = booking.createdBy === 'admin' || booking.adminId;
-        
-        // Clean up customer name
-        let customerName = 'Customer';
-        if (isAdminBooking) {
-          customerName = 'Store Client';
-        } else if (booking.customer?.fullname) {
-          customerName = booking.customer.fullname.replace('Admin confirmed', '').trim();
-        } else if (booking.customerName) {
-          customerName = booking.customerName.replace('Admin confirmed', '').trim();
-        }
-        
-        // Clean up service name
-        let serviceName = 'Service';
-        if (booking.service?.title) {
-          serviceName = booking.service.title.replace('aqssssssssssssssssssssssssssssss', '').trim();
-        } else if (booking.serviceName) {
-          serviceName = booking.serviceName.replace('aqssssssssssssssssssssssssssssss', '').trim();
-        }
-
-        return {
-          _id: booking._id || booking.bookingId || `booking-${Date.now()}-${Math.random()}`,
-          customerId: booking.customer?._id,
-          customerName: customerName,
-          customerEmail: isAdminBooking ? (booking.adminEmail || '') : (booking.customer?.email || ''),
-          customerPhone: isAdminBooking ? (booking.adminPhone || '') : (booking.customer?.phone || ''),
-          isAdminBooking: isAdminBooking,
-          serviceName: serviceName,
-          serviceCategory: booking.service?.category || booking.serviceCategory || 'General',
-          bookingDate: booking.bookingDate || booking.date || booking.appointmentDate,
-          startTime: booking.startTime || booking.time || '09:00',
-          endTime: booking.endTime || '11:00',
-          status: (booking.status || 'pending').toLowerCase(),
-          amount: parseFloat(booking.totalPrice || booking.amount || booking.price || 0).toFixed(2),
-          createdAt: booking.createdAt || new Date().toISOString(),
-          originalData: booking
-        };
-      });
-
-      // Sort by booking date (newest first)
-      processedBookings.sort((a, b) => {
-        const dateA = a.bookingDate ? new Date(a.bookingDate) : new Date();
-        const dateB = b.bookingDate ? new Date(b.bookingDate) : new Date();
-        return dateB - dateA; // Descending order
-      });
-
-      return processedBookings;
-    };
-
     // ==================== FORMATTING FUNCTIONS ====================
     const formatCustomerName = (name) => {
       if (!name) return 'Customer';
+      
+      if (name.includes('CID:')) {
+        return name;
+      }
+      
       return name
         .replace(/Admin confirmed/gi, '')
         .replace(/aqssss+/gi, '')
@@ -1003,16 +1596,20 @@ export default {
       }
     };
 
-    const formatTimeSlot = (startTime, endTime) => {
-      if (!startTime || !endTime) return 'No time';
-      return `${startTime} - ${endTime}`;
-    };
-
     const getCleanInitials = (name) => {
       const cleanName = formatCustomerName(name);
-      if (!cleanName) return '??';
-      if (cleanName === 'Store Client') return 'SC';
-      return cleanName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+      if (!cleanName) return 'C';
+      
+      if (cleanName.includes('CID:')) {
+        return 'C';
+      }
+      
+      const words = cleanName.split(' ');
+      if (words.length === 1 && words[0] === 'Customer') {
+        return 'C';
+      }
+      
+      return words.map(n => n[0]).join('').toUpperCase().substring(0, 2);
     };
 
     const formatStatus = (status) => {
@@ -1037,7 +1634,6 @@ export default {
         if (diffDays === 0) return 'Today';
         if (diffDays === 1) return 'Tomorrow';
         if (diffDays < 7) return `${diffDays} days`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
         return 'Later';
       } catch (err) {
         return '';
@@ -1089,12 +1685,10 @@ export default {
         completed: bookings.value.filter(b => b.status === 'completed').length,
         revenue: bookings.value
           .filter(b => b.status !== 'cancelled')
-          .reduce((sum, booking) => sum + (parseFloat(booking.amount) || 0), 0)
+          .reduce((sum, booking) => sum + (parseFloat(booking.actualPrice || booking.servicePrice || booking.amount) || 0), 0)
           .toFixed(2)
       };
     };
-
-    const getBookingAmount = (booking) => parseFloat(booking.amount || 0).toFixed(2);
 
     // ==================== ACTION FUNCTIONS ====================
     const selectTimelinePeriod = (periodId) => {
@@ -1126,12 +1720,20 @@ export default {
       }
     };
 
-    const viewBookingDetailsModal = (booking) => {
+    const viewBookingDetailsModal = async (booking) => {
       selectedBooking.value = booking;
+      customerDetails.value = null;
+      loadingCustomerDetails.value = false;
+      customerDetailsError.value = "";
+      
+      await fetchCustomerDetails(booking);
     };
 
     const closeModal = () => {
       selectedBooking.value = null;
+      customerDetails.value = null;
+      loadingCustomerDetails.value = false;
+      customerDetailsError.value = "";
     };
 
     const contactCustomer = (booking) => {
@@ -1143,11 +1745,11 @@ export default {
     };
 
     const promoteServices = () => {
-      alert("🎯 Share your booking link to get more bookings!\n\nTo promote your services:\n1. Share your unique booking link\n2. Post on social media\n3. Ask satisfied clients for referrals\n4. List on local business directories");
+      alert("🎯 Share your booking link to get more bookings!");
     };
 
     const getActiveFilterLabel = () => {
-      if (selectedPeriod.value === "all") return "Future";
+      if (selectedPeriod.value === "all") return "All Bookings";
       const period = timelinePeriods.value.find(p => p.id === selectedPeriod.value);
       return period ? period.label : "";
     };
@@ -1172,15 +1774,17 @@ export default {
       }
       
       const csvContent = [
-        ['Customer Name', 'Email', 'Service', 'Date', 'Time', 'Status', 'Amount'].join(','),
+        ['Customer Name', 'Email', 'Service', 'Category', 'Subcategory', 'Date', 'Time', 'Status', 'Amount'].join(','),
         ...bookings.value.map(b => [
           `"${b.customerName}"`,
           `"${b.customerEmail || ''}"`,
           `"${b.serviceName}"`,
+          `"${b.serviceCategory || ''}"`,
+          `"${b.serviceSubcategory || ''}"`,
           `"${formatCleanDate(b.bookingDate)}"`,
-          `"${b.startTime} - ${b.endTime}"`,
-          `"${formatStatus(b.status)}"`,
-          `"$${b.amount}"`
+          `"${formatTimeSlot(b.startTime, b.endTime)}"`,
+          `"${isPastBooking(b) ? 'Past Booking' : formatStatus(b.status)}"`,
+          `"ETB ${b.actualPrice || b.servicePrice || b.amount}"`
         ].join(','))
       ].join('\n');
       
@@ -1215,6 +1819,11 @@ export default {
       selectedBooking,
       showDebug,
       lastUpdatedTime,
+      
+      // Customer details state
+      customerDetails,
+      loadingCustomerDetails,
+      customerDetailsError,
       
       // Debug
       debugProviderId,
@@ -1251,20 +1860,67 @@ export default {
       formatCleanDate,
       formatCustomerName,
       formatServiceName,
-      getBookingAmount,
       formatStatus,
       calculateDuration,
       formatTimeSlot,
+      convertTo12HourFormat, // Added new function
       getTimeUntilBooking,
       formatRelativeTime,
-      isTodayBooking
+      isTodayBooking,
+      isPastBooking,
+      isTomorrowBooking,
+      isNext5DaysBooking
     };
   }
 };
 </script>
 
 <style scoped>
-/* Base Styles */
+/* Add these new styles to your existing CSS */
+
+/* Customer ID Badge */
+.customer-id-badge {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.customer-id {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 8px;
+  border: 1px solid #e5e7eb;
+  display: inline-block;
+}
+
+/* Service Meta Row */
+.service-meta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.service-subcategory {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid #bae6fd;
+}
+
+
 .bookings-section {
   max-width: 1400px;
   margin: 0 auto;
@@ -1831,6 +2487,11 @@ export default {
   border-left: 4px solid #6b7280;
 }
 
+.professional-card.past-card {
+  border-left: 4px solid #94a3b8;
+  opacity: 0.9;
+}
+
 /* Card Header */
 .card-header-section {
   display: flex;
@@ -1944,6 +2605,19 @@ export default {
 .status-badge.cancelled {
   background: linear-gradient(135deg, #fee2e2, #fca5a5);
   color: #dc2626;
+}
+
+/* NEW: Past Booking Badge */
+.past-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  color: #64748b;
+  border: 1px solid #cbd5e1;
 }
 
 .booking-id {
@@ -2263,6 +2937,7 @@ export default {
 .service-cell {
   flex-direction: column;
   align-items: flex-start;
+  gap: 4px;
 }
 
 .service-cell strong {
@@ -2275,6 +2950,13 @@ export default {
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 0.75rem;
+  display: inline-block;
+}
+
+.service-price {
+  color: #059669;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .datetime-container {
@@ -2458,7 +3140,6 @@ export default {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
-
 /* Add this to your existing CSS */
 .loading-indicator {
   font-size: 0.8rem;
@@ -2478,6 +3159,7 @@ export default {
   align-items: center;
   gap: 10px;
 }
+
 .modal-header {
   display: flex;
   justify-content: space-between;

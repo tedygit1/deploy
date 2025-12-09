@@ -297,15 +297,142 @@ export default {
   async created() {
     await this.initializeTimeSlots();
     this.generate7DaySchedule();
+    // ✅ CRITICAL CHANGE: Apply default time slots to all days
+    this.applyDefaultToAllDays();
     await this.fetchBookedSlots();
   },
   methods: {
+    // ✅ NEW METHOD: Apply default time slots to all generated days
+    applyDefaultToAllDays() {
+      this.generatedDays.forEach(day => {
+        const dateKey = day.date;
+        // Only apply defaults if no slots exist for this day
+        if (!this.dailySchedules[dateKey] || this.dailySchedules[dateKey].length === 0) {
+          this.dailySchedules[dateKey] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
+        }
+      });
+    },
+    
+    // ✅ MODIFIED: Initialize time slots with auto-availability
+    async initializeTimeSlots() {
+      this.loading = true;
+      try {
+        const response = await http.get(`/services/${this.serviceId}/slots`);
+        this.existingSlots = response.data || [];
+        if (this.existingSlots.length > 0) {
+          this.loadExistingSlotsIntoDays(this.existingSlots);
+        } else {
+          this.initializeEmptyDays();
+        }
+      } catch (error) {
+        console.warn('Could not load existing slots:', error);
+        this.initializeEmptyDays();
+      } finally {
+        this.loading = false;
+      }
+    },
+    
+    // ✅ MODIFIED: Load existing slots but ensure all days in the 7-day window have time slots
+    loadExistingSlotsIntoDays(slots) {
+      this.dailySchedules = {};
+      slots.forEach(slot => {
+        this.existingSlotId = slot.slotId;
+        if (slot.weeklySchedule && Array.isArray(slot.weeklySchedule)) {
+          slot.weeklySchedule.forEach(daySchedule => {
+            if (daySchedule && daySchedule.date && Array.isArray(daySchedule.timeSlots)) {
+              const dateString = this.parseBackendDate(daySchedule.date);
+              if (this.isDateInNext7Days(dateString)) {
+                this.dailySchedules[dateString] = daySchedule.timeSlots.map(timeSlot => ({
+                  startTime: this.formatTime(timeSlot.startTime),
+                  endTime: this.formatTime(timeSlot.endTime),
+                  isAvailable: timeSlot.isAvailable !== false,
+                  isBooked: false
+                }));
+              }
+            }
+          });
+        }
+      });
+      
+      // ✅ NEW: After loading existing slots, ensure all days in the 7-day window have time slots
+      // This is what makes auto-added days automatically available
+      setTimeout(() => {
+        this.ensureAllDaysHaveSlots();
+      }, 100);
+    },
+    
+    // ✅ NEW METHOD: Ensure all days in the generated schedule have time slots
+    ensureAllDaysHaveSlots() {
+      if (!this.generatedDays || this.generatedDays.length === 0) return;
+      
+      this.generatedDays.forEach(day => {
+        const dateKey = day.date;
+        // If this day doesn't have any slots yet, add default ones
+        if (!this.dailySchedules[dateKey] || this.dailySchedules[dateKey].length === 0) {
+          this.dailySchedules[dateKey] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
+        }
+      });
+    },
+    
+    // ✅ MODIFIED: Generate 7-day schedule with auto-availability
+    generate7DaySchedule() {
+      this.generatedDays = [];
+      const today = new Date();
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const dayOfWeek = this.getDayOfWeek(date);
+        const displayDate = this.formatDateForDisplay(date);
+        const dateString = this.formatDateForInput(date);
+        this.generatedDays.push({
+          date: dateString,
+          dayKey: dayOfWeek.key,
+          dayName: dayOfWeek.name,
+          display: `${dayOfWeek.label}, ${displayDate}`,
+          isToday: i === 0
+        });
+        if (!this.dailySchedules[dateString]) {
+          this.dailySchedules[dateString] = [];
+        }
+      }
+      
+      // ✅ NEW: Auto-add default time slots for any empty days
+      // This ensures new days are automatically available
+      this.ensureAllDaysHaveSlots();
+    },
+    
+    // ✅ MODIFIED: Toggle working day - preserve auto-availability logic
+    toggleWorkingDay(date, isWorking) {
+      if (isWorking) {
+        if (!this.dailySchedules[date] || this.dailySchedules[date].length === 0) {
+          // Use default time slots when turning a day ON
+          this.dailySchedules[date] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
+        }
+      } else {
+        this.dailySchedules[date] = [];
+      }
+    },
+    
+    // ✅ MODIFIED: Reset to default - now resets ALL days to default
+    resetToDefault() {
+      if (confirm('Are you sure you want to reset to default schedule? This will clear all your changes and set 4 default time slots for ALL days.')) {
+        this.initializeEmptyDays();
+        this.generate7DaySchedule();
+        // Apply default time slots to ALL days (not just working days)
+        this.generatedDays.forEach(day => {
+          this.dailySchedules[day.date] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
+        });
+        this.setSuccess('Reset to default schedule with 4 time slots for all 7 days');
+      }
+    },
+    
     // ✅ FORMAT TIME TO HH:mm
     formatTime(timeStr) {
       if (!timeStr) return '09:00';
       const [h, m] = timeStr.split(':').map(Number);
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     },
+    
     // ✅ FORMAT FOR DISPLAY IN BOOKED SLOTS (12-HOUR)
     formatTime12(time24) {
       if (!time24) return '';
@@ -314,12 +441,14 @@ export default {
       const displayH = h % 12 || 12;
       return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
     },
+    
     // ✅ UPDATE TIME SLOT
     updateTimeSlot(slot, field, newValue) {
       if (newValue && newValue.length === 5) { // HH:mm
         slot[field] = newValue;
       }
     },
+    
     // ✅ FORMAT DATE FOR DISPLAY WITH YEAR (e.g., "Dec 4, 2025")
     formatDateForDisplay(date) {
       if (typeof date === 'string') date = new Date(date);
@@ -328,6 +457,7 @@ export default {
       const year = date.getFullYear();
       return `${month} ${day}, ${year}`;
     },
+    
     async fetchBookedSlots() {
       this.loadingBookings = true;
       try {
@@ -363,6 +493,7 @@ export default {
         this.loadingBookings = false;
       }
     },
+    
     markBookedSlotsInDailySchedules() {
       this.generatedDays.forEach(day => {
         const dateKey = day.date;
@@ -392,6 +523,7 @@ export default {
         });
       });
     },
+    
     getBookingForSlot(date, startTime, endTime) {
       const backendDate = this.formatDateForBackend(date);
       return this.bookedSlots.find(booking => {
@@ -400,27 +532,7 @@ export default {
                booking.endTime === endTime;
       });
     },
-    generate7DaySchedule() {
-      this.generatedDays = [];
-      const today = new Date();
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        const dayOfWeek = this.getDayOfWeek(date);
-        const displayDate = this.formatDateForDisplay(date);
-        const dateString = this.formatDateForInput(date);
-        this.generatedDays.push({
-          date: dateString,
-          dayKey: dayOfWeek.key,
-          dayName: dayOfWeek.name,
-          display: `${dayOfWeek.label}, ${displayDate}`,
-          isToday: i === 0
-        });
-        if (!this.dailySchedules[dateString]) {
-          this.dailySchedules[dateString] = [];
-        }
-      }
-    },
+    
     getDayOfWeek(date) {
       const days = [
         { key: 'sunday', name: 'sunday', label: 'Sunday' },
@@ -433,9 +545,11 @@ export default {
       ];
       return days[date.getDay()];
     },
+    
     isWorkingAtDay(date) {
       return this.dailySchedules[date]?.length > 0;
     },
+    
     addTimeSlot(date) {
       const slots = this.dailySchedules[date] || [];
       const lastSlot = slots.length > 0 ? slots[slots.length - 1] : null;
@@ -450,60 +564,16 @@ export default {
       const newSlot = { startTime: newStartTime, endTime: newEndTime, isAvailable: true, isBooked: false };
       this.dailySchedules[date] = [...slots, newSlot];
     },
+    
     removeTimeSlot(date, slotIndex) {
       if (!this.dailySchedules[date] || slotIndex >= this.dailySchedules[date].length) return;
       this.dailySchedules[date].splice(slotIndex, 1);
     },
-    toggleWorkingDay(date, isWorking) {
-      if (isWorking) {
-        if (!this.dailySchedules[date] || this.dailySchedules[date].length === 0) {
-          this.dailySchedules[date] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
-        }
-      } else {
-        this.dailySchedules[date] = [];
-      }
-    },
-    async initializeTimeSlots() {
-      this.loading = true;
-      try {
-        const response = await http.get(`/services/${this.serviceId}/slots`);
-        this.existingSlots = response.data || [];
-        if (this.existingSlots.length > 0) {
-          this.loadExistingSlotsIntoDays(this.existingSlots);
-        } else {
-          this.initializeEmptyDays();
-        }
-      } catch (error) {
-        console.warn('Could not load existing slots:', error);
-        this.initializeEmptyDays();
-      } finally {
-        this.loading = false;
-      }
-    },
+    
     initializeEmptyDays() {
       this.dailySchedules = {};
     },
-    loadExistingSlotsIntoDays(slots) {
-      this.dailySchedules = {};
-      slots.forEach(slot => {
-        this.existingSlotId = slot.slotId;
-        if (slot.weeklySchedule && Array.isArray(slot.weeklySchedule)) {
-          slot.weeklySchedule.forEach(daySchedule => {
-            if (daySchedule && daySchedule.date && Array.isArray(daySchedule.timeSlots)) {
-              const dateString = this.parseBackendDate(daySchedule.date);
-              if (this.isDateInNext7Days(dateString)) {
-                this.dailySchedules[dateString] = daySchedule.timeSlots.map(timeSlot => ({
-                  startTime: this.formatTime(timeSlot.startTime),
-                  endTime: this.formatTime(timeSlot.endTime),
-                  isAvailable: timeSlot.isAvailable !== false,
-                  isBooked: false
-                }));
-              }
-            }
-          });
-        }
-      });
-    },
+    
     isDateInNext7Days(dateString) {
       const today = new Date();
       const targetDate = new Date(dateString);
@@ -511,6 +581,7 @@ export default {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays >= 0 && diffDays < 7;
     },
+    
     async saveTimeSlots() {
       if (!this.validateAllTimeSlots()) {
         this.setError('Please fix time slot errors before saving');
@@ -558,10 +629,12 @@ export default {
         this.saving = false;
       }
     },
+    
     formatDateForInput(date) {
       if (typeof date === 'string') return date;
       return date.toISOString().split('T')[0];
     },
+    
     formatDateForBackend(dateString) {
       const date = new Date(dateString);
       const day = date.getDate().toString().padStart(2, '0');
@@ -569,6 +642,7 @@ export default {
       const year = date.getFullYear();
       return `${day}/${month}/${year}`;
     },
+    
     parseBackendDate(dateString) {
       if (!dateString) return '';
       const parts = dateString.split('/');
@@ -577,6 +651,7 @@ export default {
       }
       return '';
     },
+    
     validateTimeSlot(timeSlot) {
       timeSlot.hasError = false;
       timeSlot.errorMessage = '';
@@ -589,6 +664,7 @@ export default {
       }
       return true;
     },
+    
     validateAllTimeSlots() {
       let isValid = true;
       this.generatedDays.forEach(day => {
@@ -601,19 +677,7 @@ export default {
       });
       return isValid;
     },
-    resetToDefault() {
-      if (confirm('Are you sure you want to reset to default schedule? This will clear all your changes and set 4 default time slots for each working day.')) {
-        this.initializeEmptyDays();
-        this.generate7DaySchedule();
-        const workingDays = ['monday', 'tuesday', 'wednesday', 'thursday'];
-        this.generatedDays.forEach(day => {
-          if (workingDays.includes(day.dayKey)) {
-            this.dailySchedules[day.date] = JSON.parse(JSON.stringify(this.defaultTimeSlots));
-          }
-        });
-        this.setSuccess('Reset to default schedule with 4 working days and 4 time slots each');
-      }
-    },
+    
     handleApiError(error, operation) {
       console.error(`❌ Error during ${operation}:`, error);
       let errorMsg = `Failed to ${operation}`;
@@ -630,13 +694,16 @@ export default {
       }
       this.setError(errorMsg);
     },
+    
     handleCancel() {
       this.$emit('close');
     },
+    
     setError(message) {
       this.errorMessage = message;
       setTimeout(() => { this.errorMessage = ''; }, 5000);
     },
+    
     setSuccess(message) {
       this.successMessage = message;
       setTimeout(() => { this.successMessage = ''; }, 3000);
