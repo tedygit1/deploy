@@ -24,7 +24,7 @@ const getBaseURL = () => {
 
 const http = axios.create({
   baseURL: getBaseURL(),
-  timeout: 15000,
+  timeout: 8000, // ⚠️ REDUCED FROM 15000ms to 8000ms (8 seconds)
   // ⚠️ REMOVE problematic headers that cause CORS issues
   headers: {
     "Content-Type": "application/json",

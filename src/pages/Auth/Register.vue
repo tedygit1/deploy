@@ -393,7 +393,8 @@ const handleCertificateUpload = (event) => {
   }
 };
 
-// Form submission
+
+// Form submission - UPDATED with review message and redirect
 const handleSignup = async () => {
   errorMessage.value = '';
   successMessage.value = '';
@@ -431,11 +432,36 @@ const handleSignup = async () => {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    successMessage.value = "Registration successful! Redirecting to login...";
+    // UPDATED: Short and informative review message with redirect
+    successMessage.value = "Registration submitted successfully! Your account is now under review. You'll receive an email notification once approved.";
     
+    // Clear the form after successful registration
+    setTimeout(() => {
+      // Reset form
+      signup.value = {
+        fullname: '',
+        email: '',
+        phonenumber: '',
+        location: '',
+        FIN: '',
+        serviceCategoryId: '',
+        workExperience: '',
+        certificate: null,
+        password: '',
+        confirmPassword: '',
+        accept: false,
+      };
+      
+      // Clear file input
+      if (fileInput.value) {
+        fileInput.value.value = '';
+      }
+    }, 1000);
+
+    // Redirect to login after 4 seconds (gives user time to read the message)
     setTimeout(() => {
       router.push('/login');
-    }, 2000);
+    }, 4000);
 
   } catch (error) {
     console.error('Registration error:', error);

@@ -356,7 +356,7 @@ export default {
     const router = useRouter();
     const route = useRoute();
     
-    // Reactive data - CHANGED: Start with false, not true!
+    // Reactive data
     const loading = ref(false);
     const criticalError = ref("");
     const hasData = ref(false);
@@ -390,11 +390,11 @@ export default {
     const lastServicesEndpoint = ref("");
     const lastBookingsEndpoint = ref("");
 
-    // ========== NEW: NOTIFICATION FUNCTIONS ==========
+    // ========== NOTIFICATION FUNCTIONS ==========
 
-    // Fetch notifications from API
+    // Fetch notifications from API - Using only correct endpoint
     const fetchNotifications = async () => {
-      if (!props.provider?.pid) return;
+      if (!props.provider) return;
       
       loadingNotifications.value = true;
       notificationError.value = "";
@@ -402,16 +402,24 @@ export default {
       try {
         console.log("🔔 Fetching notifications...");
         
-        // Try different endpoints
-        const endpoints = [
-          { url: `/infinity-booking/notifications`, name: "primary" },
-          { url: `/notifications`, name: "secondary" },
-          { url: `/notifications?userId=${props.provider.pid}`, name: "query" }
-        ];
+        // Get user ID from localStorage
+        const loggedProvider = localStorage.getItem("loggedProvider");
+        let userId = null;
         
-        for (const endpoint of endpoints) {
+        if (loggedProvider) {
           try {
-            const response = await http.get(endpoint.url);
+            const providerData = JSON.parse(loggedProvider);
+            userId = providerData._id; // MongoDB ObjectId
+            console.log("📋 Found user ID:", userId);
+          } catch (e) {
+            console.warn("⚠️ Could not parse loggedProvider");
+          }
+        }
+        
+        // Use CORRECT endpoint only: /notifications with userId parameter
+        if (userId) {
+          try {
+            const response = await http.get(`/notifications?userId=${userId}`, { timeout: 5000 });
             console.log("✅ Notifications response:", response.data);
             
             if (response.data && Array.isArray(response.data)) {
@@ -425,22 +433,25 @@ export default {
                 action: notification.action,
                 data: notification.data
               }));
-              break;
+              console.log(`✅ Loaded ${notifications.value.length} real notifications`);
+            } else {
+              // If response exists but no data, use demo
+              notifications.value = generateDemoNotifications();
+              console.log("📋 Using demo notifications (no data in response)");
             }
           } catch (error) {
-            console.log(`⚠️ ${endpoint.name} endpoint failed:`, error.message);
+            console.log("⚠️ Notifications endpoint failed:", error.message);
+            notifications.value = generateDemoNotifications();
+            notificationError.value = "Using demo notifications";
           }
-        }
-        
-        // If no real notifications, create demo ones
-        if (notifications.value.length === 0) {
-          console.log("📋 Creating demo notifications");
+        } else {
+          console.warn("⚠️ No user ID found");
           notifications.value = generateDemoNotifications();
         }
         
       } catch (error) {
         console.error("❌ Failed to fetch notifications:", error);
-        notificationError.value = "Failed to load notifications";
+        notificationError.value = "Using demo data";
         notifications.value = generateDemoNotifications();
       } finally {
         loadingNotifications.value = false;
@@ -456,7 +467,7 @@ export default {
           message: 'John Doe booked your "Professional Cleaning" service for tomorrow.',
           type: 'booking',
           read: false,
-          createdAt: new Date(Date.now() - 30 * 60000).toISOString(), // 30 minutes ago
+          createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
           action: '/bookings'
         },
         {
@@ -465,7 +476,7 @@ export default {
           message: 'Jane Smith left a 5-star review for your "Car Wash" service.',
           type: 'review',
           read: false,
-          createdAt: new Date(Date.now() - 2 * 3600000).toISOString(), // 2 hours ago
+          createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
           action: '/reviews'
         },
         {
@@ -474,7 +485,7 @@ export default {
           message: 'You have a booking with Sarah Johnson in 1 hour.',
           type: 'reminder',
           read: true,
-          createdAt: new Date(Date.now() - 5 * 3600000).toISOString(), // 5 hours ago
+          createdAt: new Date(Date.now() - 5 * 3600000).toISOString(),
           action: '/bookings'
         },
         {
@@ -483,36 +494,31 @@ export default {
           message: 'New features have been added to your dashboard.',
           type: 'system',
           read: true,
-          createdAt: new Date(Date.now() - 24 * 3600000).toISOString(), // 24 hours ago
+          createdAt: new Date(Date.now() - 24 * 3600000).toISOString(),
           action: null
         }
       ];
     };
 
-    // Mark notification as read
+    // Mark notification as read - Handle demo vs real
     const markAsRead = async (notificationId) => {
       try {
-        // Find notification
         const notification = notifications.value.find(n => n._id === notificationId);
         if (!notification || notification.read) return;
         
-        // Update locally first for instant feedback
+        // Update locally first
         notification.read = true;
         
-        // Try to update on server
-        const endpoints = [
-          { url: `/infinity-booking/notifications/${notificationId}/read`, name: "primary" },
-          { url: `/notifications/${notificationId}/read`, name: "secondary" }
-        ];
-        
-        for (const endpoint of endpoints) {
+        // Only send to server if it's NOT a demo notification
+        if (!notificationId.startsWith('demo-')) {
           try {
-            await http.put(endpoint.url);
-            console.log(`✅ Marked notification ${notificationId} as read`);
-            break;
+            await http.put(`/notifications/${notificationId}/read`, {}, { timeout: 3000 });
+            console.log(`✅ Marked real notification as read: ${notificationId}`);
           } catch (error) {
-            console.log(`⚠️ ${endpoint.name} endpoint failed for mark as read:`, error.message);
+            console.log(`⚠️ Failed to mark as read on server:`, error.message);
           }
+        } else {
+          console.log(`✅ Marked demo notification as read: ${notificationId}`);
         }
         
       } catch (error) {
@@ -520,7 +526,7 @@ export default {
       }
     };
 
-    // Mark all notifications as read
+    // Mark all notifications as read - Handle demo vs real
     const markAllAsRead = async () => {
       try {
         const unreadNotifications = notifications.value.filter(n => !n.read);
@@ -529,60 +535,55 @@ export default {
         // Update locally first
         notifications.value.forEach(n => n.read = true);
         
-        // Try to update on server
-        const endpoints = [
-          { url: `/infinity-booking/notifications/all/read`, name: "primary" },
-          { url: `/notifications/all/read`, name: "secondary" },
-          { url: `/infinity-booking/notifications/bulk/update`, name: "bulk" }
-        ];
+        // Get real notification IDs (non-demo)
+        const realNotificationIds = unreadNotifications
+          .filter(n => !n._id.startsWith('demo-'))
+          .map(n => n._id);
         
-        for (const endpoint of endpoints) {
+        // Only send to server if we have real notifications
+        if (realNotificationIds.length > 0) {
           try {
-            if (endpoint.name === 'bulk') {
-              // For bulk update, send all notification IDs
-              const notificationIds = unreadNotifications.map(n => n._id);
-              await http.put(endpoint.url, { ids: notificationIds, read: true });
-            } else {
-              await http.put(endpoint.url);
-            }
-            console.log("✅ Marked all notifications as read");
-            break;
+            await http.put(`/notifications/all/read`, {}, { timeout: 3000 });
+            console.log(`✅ Marked ${realNotificationIds.length} real notifications as read`);
           } catch (error) {
-            console.log(`⚠️ ${endpoint.name} endpoint failed for mark all read:`, error.message);
+            console.log(`⚠️ Failed to mark all read on server:`, error.message);
           }
         }
+        
+        console.log(`✅ Marked ${unreadNotifications.length} notifications as read`);
         
       } catch (error) {
         console.error("❌ Failed to mark all notifications as read:", error);
       }
     };
 
-    // Delete notification
+    // Delete notification - Handle demo vs real
     const deleteNotification = async (notificationId) => {
       try {
+        // Check if it's a demo notification
+        const isDemoNotification = notificationId.startsWith('demo-');
+        
         // Remove locally first
         notifications.value = notifications.value.filter(n => n._id !== notificationId);
         
-        // Try to delete from server
-        const endpoints = [
-          { url: `/infinity-booking/notifications/${notificationId}`, name: "primary" },
-          { url: `/notifications/${notificationId}`, name: "secondary" }
-        ];
-        
-        for (const endpoint of endpoints) {
+        // Only try to delete from server if it's NOT a demo notification
+        if (!isDemoNotification) {
           try {
-            await http.delete(endpoint.url);
-            console.log(`✅ Deleted notification ${notificationId}`);
-            break;
+            await http.delete(`/notifications/${notificationId}`, { timeout: 3000 });
+            console.log(`✅ Deleted real notification: ${notificationId}`);
           } catch (error) {
-            console.log(`⚠️ ${endpoint.name} endpoint failed for delete:`, error.message);
+            console.log(`⚠️ Failed to delete from server:`, error.message);
           }
+        } else {
+          console.log(`✅ Deleted demo notification: ${notificationId}`);
         }
         
       } catch (error) {
         console.error("❌ Failed to delete notification:", error);
-        // Re-add notification if deletion failed
-        fetchNotifications();
+        // Don't re-fetch for demo notifications
+        if (!notificationId.startsWith('demo-')) {
+          fetchNotifications();
+        }
       }
     };
 
@@ -670,7 +671,6 @@ export default {
 
     // Handle blur on notifications dropdown
     const onNotificationBlur = (event) => {
-      // Close dropdown after a short delay
       setTimeout(() => {
         if (!event.relatedTarget || !event.relatedTarget.closest('.notification-container')) {
           showNotifications.value = false;
@@ -681,7 +681,6 @@ export default {
     // View all notifications
     const viewAllNotifications = () => {
       console.log("View all notifications clicked");
-      // Navigate to notifications page if available, otherwise show all in dropdown
       showNotifications.value = true;
     };
 
@@ -701,20 +700,17 @@ export default {
     const shouldLoadData = () => {
       console.log('🔍 Checking if should load data:');
       
-      // 1. Check if we have a provider prop
       if (!props.provider || !props.provider.pid) {
         console.warn('⚠️ No provider data available');
         return false;
       }
       
-      // 2. Check if user is logged in
       const token = localStorage.getItem("provider_token");
       if (!token) {
         console.warn('⚠️ No authentication token');
         return false;
       }
       
-      // 3. Check if we're on the provider home route
       const isProviderHome = route.path.includes('/provider/home') || 
                             route.name === 'ProviderHome';
       
@@ -750,46 +746,38 @@ export default {
       }
     };
 
-    // [REST OF YOUR EXISTING CODE REMAINS THE SAME - loadDashboardData, process functions, etc.]
-    // API Endpoints to try (in order)
+    // ========== CORRECT API ENDPOINTS ONLY ==========
+    
+    // Based on your logs, these are the CORRECT endpoints:
     const serviceEndpoints = [
-      { url: (pid) => `/infinity-booking/services/provider/${pid}`, name: "primary" },
-      { url: (pid) => `/services/provider/${pid}`, name: "secondary" },
-      { url: (pid) => `/services?providerId=${pid}`, name: "query" }
+      { url: (pid) => `/services?providerId=${pid}`, name: "services" }
     ];
 
     const bookingEndpoints = [
-      { url: (pid) => `/infinity-booking/bookings/provider/${pid}`, name: "primary" },
-      { url: (pid) => `/bookings/provider/${pid}`, name: "secondary" },
-      { url: (pid) => `/bookings?providerId=${pid}`, name: "query" },
-      { url: (pid) => `/infinity-booking/bookings/stats/provider/${pid}`, name: "stats" }
+      { url: (pid) => `/bookings/provider/${pid}`, name: "bookings" }
     ];
 
-    // Fetch data from endpoint with fallback
-    const fetchWithFallback = async (endpoints, pid, dataType) => {
-      for (const endpoint of endpoints) {
-        try {
-          const url = endpoint.url(pid);
-          console.log(`Trying ${dataType} endpoint: ${url}`);
-          
-          const response = await http.get(url);
-          console.log(`${dataType} response from ${endpoint.name}:`, response.data);
-          
-          if (response.data) {
-            if (dataType === 'services') lastServicesEndpoint.value = endpoint.name;
-            if (dataType === 'bookings') lastBookingsEndpoint.value = endpoint.name;
-            
-            return { 
-              success: true, 
-              data: response.data,
-              endpoint: endpoint.name
-            };
-          }
-        } catch (error) {
-          console.log(`${endpoint.name} endpoint failed:`, error.message);
-        }
+    // Fetch data from CORRECT endpoint only
+    const fetchData = async (endpoint, pid, dataType) => {
+      try {
+        const url = endpoint.url(pid);
+        console.log(`📤 Fetching ${dataType} from: ${url}`);
+        
+        const response = await http.get(url, { timeout: 8000 });
+        console.log(`✅ ${dataType} response received`);
+        
+        if (dataType === 'services') lastServicesEndpoint.value = endpoint.name;
+        if (dataType === 'bookings') lastBookingsEndpoint.value = endpoint.name;
+        
+        return { 
+          success: true, 
+          data: response.data,
+          endpoint: endpoint.name
+        };
+      } catch (error) {
+        console.log(`⚠️ ${dataType} fetch failed:`, error.message);
+        return { success: false, data: null };
       }
-      return { success: false, data: null };
     };
 
     // Helper: Check if a date is today
@@ -799,23 +787,16 @@ export default {
       try {
         let dateObj;
         
-        // If it's already a Date object
         if (dateString instanceof Date) {
           dateObj = dateString;
-        } 
-        // If it's a string
-        else if (typeof dateString === 'string') {
+        } else if (typeof dateString === 'string') {
           dateObj = new Date(dateString);
-        }
-        // If it's a timestamp
-        else if (typeof dateString === 'number') {
+        } else if (typeof dateString === 'number') {
           dateObj = new Date(dateString);
-        }
-        else {
+        } else {
           return false;
         }
         
-        // Check if date is valid
         if (isNaN(dateObj.getTime())) {
           return false;
         }
@@ -888,13 +869,11 @@ export default {
     });
 
     const processBookingData = (booking) => {
-      // Look for date in various possible fields
       let bookingDate = null;
       let dateFieldUsed = '';
       
-      // Check various possible date fields in order of priority
       const possibleDateFields = [
-        'bookingDate',  // This seems to be the correct field based on logs
+        'bookingDate',
         'date', 
         'startDate',
         'appointmentDate',
@@ -950,24 +929,19 @@ export default {
       bookingsArray.forEach((booking, index) => {
         const status = booking.status;
         
-        // Count by status
         if (status === 'completed') stats.completed++;
         else if (status === 'confirmed') stats.confirmed++;
         else if (status === 'pending') stats.pending++;
         else if (status === 'cancelled') stats.cancelled++;
         
-        // Calculate revenue from completed and confirmed bookings
         if (status === 'completed' || status === 'confirmed') {
           stats.totalRevenue += booking.amount || 0;
         }
         
-        // Check if booking is today
         if (isToday(booking.date)) {
           stats.todayBookings++;
-          console.log(`✅ TODAY: Booking ${index + 1} - ${booking.formattedDate}`);
         }
         
-        // Check if booking is upcoming (future date)
         if (isUpcoming(booking.date) && (status === 'pending' || status === 'confirmed')) {
           stats.upcomingBookings++;
         }
@@ -983,11 +957,10 @@ export default {
       return stats;
     };
 
-    // Load all data - UPDATED: Add check at beginning
+    // Load all data - Using only correct endpoints
     const loadDashboardData = async () => {
-      // Check if we should load data
       if (!shouldLoadData()) {
-        console.log('⏸️ Skipping dashboard data load - not authenticated or not on provider home');
+        console.log('⏸️ Skipping dashboard data load');
         loading.value = false;
         return;
       }
@@ -1002,45 +975,39 @@ export default {
       criticalError.value = "";
       bookings.value = [];
       services.value = [];
-      isRealData.value = false; // Reset to false initially
+      isRealData.value = false;
 
       try {
-        console.log("=== LOADING REAL DATA ===");
-        console.log("Today:", new Date().toLocaleDateString());
+        console.log("🚀 Loading dashboard data...");
         console.log("Provider PID:", providerPid);
         
-        // Load Services
-        const servicesResult = await fetchWithFallback(serviceEndpoints, providerPid, 'services');
-        if (servicesResult.success) {
+        // Set overall timeout for dashboard
+        const overallTimeout = setTimeout(() => {
+          console.log("⏰ Dashboard load taking too long");
+          criticalError.value = "Loading data...";
+        }, 10000);
+        
+        // Load Services from CORRECT endpoint
+        const servicesResult = await fetchData(serviceEndpoints[0], providerPid, 'services');
+        if (servicesResult.success && servicesResult.data) {
           const rawData = servicesResult.data;
-          const servicesArray = Array.isArray(rawData) ? rawData : 
-                               rawData.services ? rawData.services : 
-                               rawData.data ? rawData.data : [];
+          const servicesArray = Array.isArray(rawData) ? rawData : [];
           
-          services.value = servicesArray.map(processServiceData);
-          console.log(`✅ Services: ${services.value.length} loaded`);
-          isRealData.value = true; // We got real data
-        } else {
-          console.warn("⚠️ No services data found");
+          if (servicesArray.length > 0) {
+            services.value = servicesArray.map(processServiceData);
+            console.log(`✅ Services: ${services.value.length} loaded`);
+            isRealData.value = true;
+          }
         }
 
-        // Load Bookings
-        const bookingsResult = await fetchWithFallback(bookingEndpoints, providerPid, 'bookings');
-        if (bookingsResult.success) {
+        // Load Bookings from CORRECT endpoint
+        const bookingsResult = await fetchData(bookingEndpoints[0], providerPid, 'bookings');
+        if (bookingsResult.success && bookingsResult.data) {
           const rawData = bookingsResult.data;
           let bookingsArray = [];
           
-          // Handle different response structures
           if (Array.isArray(rawData)) {
             bookingsArray = rawData;
-          } else if (rawData.bookings && Array.isArray(rawData.bookings)) {
-            bookingsArray = rawData.bookings;
-          } else if (rawData.data && Array.isArray(rawData.data)) {
-            bookingsArray = rawData.data;
-          } else if (rawData.totalBookings !== undefined) {
-            // This is stats endpoint response
-            bookingStats.value = { ...bookingStats.value, ...rawData };
-            isRealData.value = true; // We got real data
           }
           
           if (bookingsArray.length > 0) {
@@ -1048,29 +1015,22 @@ export default {
             const calculatedStats = calculateStatistics(bookings.value);
             bookingStats.value = { ...bookingStats.value, ...calculatedStats };
             console.log(`✅ Bookings: ${bookings.value.length} loaded`);
-            isRealData.value = true; // We got real data
+            isRealData.value = true;
           }
-        } else {
-          console.warn("⚠️ No bookings data found");
         }
 
+        clearTimeout(overallTimeout);
         hasData.value = true;
         
-        // Final summary
-        console.log("=== FINAL SUMMARY ===");
-        console.log(`Today: ${new Date().toLocaleDateString()}`);
-        console.log(`Services: ${services.value.length} (${activeServices.value} active)`);
-        console.log(`Total Bookings: ${bookingStats.value.totalBookings}`);
-        console.log(`Today's Bookings: ${bookingStats.value.todayBookings}`);
-        console.log(`Upcoming Bookings: ${bookingStats.value.upcomingBookings}`);
-        console.log(`Revenue: $${bookingStats.value.totalRevenue}`);
-        console.log(`Completion Rate: ${completionRate.value}%`);
-        console.log(`Using Real Data: ${isRealData.value}`);
-        console.log("====================");
-
+        console.log("=== DASHBOARD LOAD COMPLETE ===");
+        console.log(`Real data loaded: ${isRealData.value}`);
+        console.log(`Services: ${services.value.length}`);
+        console.log(`Bookings: ${bookings.value.length}`);
+        console.log("===============================");
+        
       } catch (error) {
         console.error("❌ Dashboard load error:", error);
-        criticalError.value = "Failed to load data. Please check connection.";
+        criticalError.value = "Unable to load dashboard data";
       } finally {
         loading.value = false;
       }
@@ -1098,7 +1058,6 @@ export default {
     const totalRevenue = computed(() => bookingStats.value.totalRevenue);
     const averageRating = computed(() => bookingStats.value.averageRating || 0);
 
-    // Use the upcomingBookings from stats calculation
     const upcomingBookings = computed(() => bookingStats.value.upcomingBookings || 0);
 
     const completionRate = computed(() => {
@@ -1170,16 +1129,13 @@ export default {
       console.log('📍 Current route:', route.path);
       console.log('🔑 Has token?', !!localStorage.getItem('provider_token'));
       
-      // Wait a bit to ensure props are available, then check if we should load
       setTimeout(() => {
         if (shouldLoadData()) {
           loadDashboardData();
-          
-          // Load notifications
           fetchNotifications();
         } else {
           console.log('ℹ️ Not loading data - waiting for authentication or wrong route');
-          loading.value = false; // Make sure loading is false
+          loading.value = false;
         }
       }, 100);
     });
@@ -1189,8 +1145,6 @@ export default {
       if (newProvider && newProvider.pid && shouldLoadData()) {
         console.log('👤 Provider data received, loading dashboard...');
         loadDashboardData();
-        
-        // Load notifications
         fetchNotifications();
       }
     }, { immediate: true });
