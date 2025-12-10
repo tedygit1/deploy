@@ -19,76 +19,90 @@
         <div class="header-actions">
           <!-- Notification Bell -->
           <div class="notification-container">
-            <button class="notification-btn" @click="toggleNotifications" @blur="onNotificationBlur">
+            <button class="notification-btn" @click="toggleNotifications" 
+                    @blur="onNotificationBlur"
+                    aria-label="Notifications">
               <i class="fa-solid fa-bell"></i>
               <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
             </button>
             
-            <!-- Notifications Dropdown -->
-            <div v-if="showNotifications" class="notifications-dropdown">
-              <div class="notifications-header">
-                <h4>Notifications</h4>
-                <div class="notifications-actions">
-                  <button v-if="unreadCount > 0" @click="markAllAsRead" class="btn-mark-all">
-                    <i class="fa-solid fa-check-double"></i> Mark all read
-                  </button>
-                  <button @click="refreshNotifications" class="btn-refresh" :disabled="loadingNotifications">
-                    <i class="fa-solid fa-rotate" :class="{ 'fa-spin': loadingNotifications }"></i>
-                  </button>
-                </div>
-              </div>
-              
-              <!-- Notifications List -->
-              <div class="notifications-list" v-if="notifications.length > 0">
-                <div v-for="notification in notifications" 
-                     :key="notification._id" 
-                     class="notification-item"
-                     :class="{ 'unread': !notification.read, 'clickable': notification.action }"
-                     @click="handleNotificationClick(notification)">
-                  <div class="notification-icon" :class="getNotificationIcon(notification.type)">
-                    <i :class="getNotificationIconClass(notification.type)"></i>
-                  </div>
-                  <div class="notification-content">
-                    <div class="notification-title">
-                      {{ notification.title || getDefaultTitle(notification.type) }}
-                    </div>
-                    <div class="notification-message">
-                      {{ notification.message }}
-                    </div>
-                    <div class="notification-meta">
-                      <span class="notification-time">{{ formatNotificationTime(notification.createdAt) }}</span>
-                      <span v-if="notification.type" class="notification-type">{{ notification.type }}</span>
-                    </div>
-                  </div>
-                  <div class="notification-actions">
-                    <button v-if="!notification.read" 
-                            @click.stop="markAsRead(notification._id)"
-                            class="btn-action mark-read"
-                            title="Mark as read">
-                      <i class="fa-solid fa-circle"></i>
+            <!-- Notifications Dropdown - Fixed positioning for mobile -->
+            <transition name="fade-slide">
+              <div v-if="showNotifications" class="notifications-dropdown" 
+                   :class="{ 'mobile-dropdown': isMobile }"
+                   @click.stop>
+                <div class="notifications-header">
+                  <h4>Notifications</h4>
+                  <div class="notifications-actions">
+                    <button v-if="unreadCount > 0" @click="markAllAsRead" class="btn-mark-all">
+                      <i class="fa-solid fa-check-double"></i> Mark all read
                     </button>
-                    <button @click.stop="deleteNotification(notification._id)"
-                            class="btn-action delete"
-                            title="Delete">
-                      <i class="fa-solid fa-times"></i>
+                    <button @click="refreshNotifications" class="btn-refresh" :disabled="loadingNotifications">
+                      <i class="fa-solid fa-rotate" :class="{ 'fa-spin': loadingNotifications }"></i>
                     </button>
                   </div>
                 </div>
-              </div>
-              
-              <!-- Empty State -->
-              <div v-else class="notifications-empty">
-                <i class="fa-solid fa-bell-slash"></i>
-                <p>No notifications yet</p>
-              </div>
-              
-              <!-- View All Link -->
-              <div class="notifications-footer">
-                <button @click="viewAllNotifications" class="btn-view-all">
-                  View all notifications <i class="fa-solid fa-arrow-right"></i>
+                
+                <!-- Notifications List -->
+                <div class="notifications-list" ref="notificationsList" v-if="notifications.length > 0">
+                  <div v-for="notification in notifications" 
+                       :key="notification._id" 
+                       class="notification-item"
+                       :class="{ 'unread': !notification.read, 'clickable': notification.action }"
+                       @click="handleNotificationClick(notification)">
+                    <div class="notification-icon" :class="getNotificationIcon(notification.type)">
+                      <i :class="getNotificationIconClass(notification.type)"></i>
+                    </div>
+                    <div class="notification-content">
+                      <div class="notification-title">
+                        {{ notification.title || getDefaultTitle(notification.type) }}
+                      </div>
+                      <div class="notification-message">
+                        {{ notification.message }}
+                      </div>
+                      <div class="notification-meta">
+                        <span class="notification-time">{{ formatNotificationTime(notification.createdAt) }}</span>
+                        <span v-if="notification.type" class="notification-type">{{ notification.type }}</span>
+                      </div>
+                    </div>
+                    <div class="notification-actions">
+                      <button v-if="!notification.read" 
+                              @click.stop="markAsRead(notification._id)"
+                              class="btn-action mark-read"
+                              aria-label="Mark as read">
+                        <i class="fa-solid fa-circle"></i>
+                      </button>
+                      <button @click.stop="deleteNotification(notification._id)"
+                              class="btn-action delete"
+                              aria-label="Delete notification">
+                        <i class="fa-solid fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Empty State -->
+                <div v-else class="notifications-empty">
+                  <i class="fa-solid fa-bell-slash"></i>
+                  <p>No notifications yet</p>
+                </div>
+                
+                <!-- View All Link -->
+                <div class="notifications-footer">
+                  <button @click="viewAllNotifications" class="btn-view-all">
+                    View all notifications <i class="fa-solid fa-arrow-right"></i>
+                  </button>
+                </div>
+                
+                <!-- Mobile close button -->
+                <button v-if="isMobile" @click="closeNotifications" class="btn-close-mobile">
+                  <i class="fa-solid fa-times"></i> Close
                 </button>
               </div>
-            </div>
+            </transition>
+            
+            <!-- Mobile overlay -->
+            <div v-if="showNotifications && isMobile" class="notifications-overlay" @click="closeNotifications"></div>
           </div>
           
           <!-- Refresh Button -->
@@ -339,7 +353,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, onMounted, computed, watch, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import http from "@/api/index.js";
 
@@ -368,6 +382,8 @@ export default {
     const notifications = ref([]);
     const loadingNotifications = ref(false);
     const notificationError = ref("");
+    const isMobile = ref(window.innerWidth <= 768);
+    const notificationsList = ref(null);
     
     // Data storage
     const bookings = ref([]);
@@ -392,7 +408,7 @@ export default {
 
     // ========== NOTIFICATION FUNCTIONS ==========
 
-    // Fetch notifications from API - Using only correct endpoint
+    // Fetch notifications from API
     const fetchNotifications = async () => {
       if (!props.provider) return;
       
@@ -435,7 +451,6 @@ export default {
               }));
               console.log(`✅ Loaded ${notifications.value.length} real notifications`);
             } else {
-              // If response exists but no data, use demo
               notifications.value = generateDemoNotifications();
               console.log("📋 Using demo notifications (no data in response)");
             }
@@ -500,7 +515,7 @@ export default {
       ];
     };
 
-    // Mark notification as read - Handle demo vs real
+    // Mark notification as read
     const markAsRead = async (notificationId) => {
       try {
         const notification = notifications.value.find(n => n._id === notificationId);
@@ -526,7 +541,7 @@ export default {
       }
     };
 
-    // Mark all notifications as read - Handle demo vs real
+    // Mark all notifications as read
     const markAllAsRead = async () => {
       try {
         const unreadNotifications = notifications.value.filter(n => !n.read);
@@ -557,7 +572,7 @@ export default {
       }
     };
 
-    // Delete notification - Handle demo vs real
+    // Delete notification
     const deleteNotification = async (notificationId) => {
       try {
         // Check if it's a demo notification
@@ -591,7 +606,7 @@ export default {
     const handleNotificationClick = (notification) => {
       if (notification.action) {
         navigateTo(notification.action);
-        showNotifications.value = false;
+        closeNotifications();
         
         // Mark as read if unread
         if (!notification.read) {
@@ -669,8 +684,16 @@ export default {
       }
     };
 
+    // Close notifications (for mobile)
+    const closeNotifications = () => {
+      showNotifications.value = false;
+    };
+
     // Handle blur on notifications dropdown
     const onNotificationBlur = (event) => {
+      // Don't close on mobile blur - let the close button handle it
+      if (isMobile.value) return;
+      
       setTimeout(() => {
         if (!event.relatedTarget || !event.relatedTarget.closest('.notification-container')) {
           showNotifications.value = false;
@@ -681,12 +704,38 @@ export default {
     // View all notifications
     const viewAllNotifications = () => {
       console.log("View all notifications clicked");
-      showNotifications.value = true;
+      showNotifications.value = false;
+      navigateTo('/notifications');
     };
 
     // Refresh notifications
     const refreshNotifications = () => {
       fetchNotifications();
+    };
+
+    // Handle window resize
+    const handleResize = () => {
+      isMobile.value = window.innerWidth <= 768;
+      // Close notifications on resize to mobile if open
+      if (isMobile.value && showNotifications.value) {
+        // Don't close, just ensure mobile styles are applied
+      }
+    };
+
+    // Handle click outside notifications
+    const handleClickOutside = (event) => {
+      if (showNotifications.value && 
+          !event.target.closest('.notification-container') &&
+          !event.target.closest('.notifications-dropdown')) {
+        closeNotifications();
+      }
+    };
+
+    // Handle escape key
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape' && showNotifications.value) {
+        closeNotifications();
+      }
     };
 
     // Computed: Count of unread notifications
@@ -746,9 +795,8 @@ export default {
       }
     };
 
-    // ========== CORRECT API ENDPOINTS ONLY ==========
+    // ========== API ENDPOINTS ==========
     
-    // Based on your logs, these are the CORRECT endpoints:
     const serviceEndpoints = [
       { url: (pid) => `/services?providerId=${pid}`, name: "services" }
     ];
@@ -757,7 +805,7 @@ export default {
       { url: (pid) => `/bookings/provider/${pid}`, name: "bookings" }
     ];
 
-    // Fetch data from CORRECT endpoint only
+    // Fetch data from endpoint
     const fetchData = async (endpoint, pid, dataType) => {
       try {
         const url = endpoint.url(pid);
@@ -957,7 +1005,7 @@ export default {
       return stats;
     };
 
-    // Load all data - Using only correct endpoints
+    // Load all data
     const loadDashboardData = async () => {
       if (!shouldLoadData()) {
         console.log('⏸️ Skipping dashboard data load');
@@ -987,7 +1035,7 @@ export default {
           criticalError.value = "Loading data...";
         }, 10000);
         
-        // Load Services from CORRECT endpoint
+        // Load Services
         const servicesResult = await fetchData(serviceEndpoints[0], providerPid, 'services');
         if (servicesResult.success && servicesResult.data) {
           const rawData = servicesResult.data;
@@ -1000,7 +1048,7 @@ export default {
           }
         }
 
-        // Load Bookings from CORRECT endpoint
+        // Load Bookings
         const bookingsResult = await fetchData(bookingEndpoints[0], providerPid, 'bookings');
         if (bookingsResult.success && bookingsResult.data) {
           const rawData = bookingsResult.data;
@@ -1129,6 +1177,11 @@ export default {
       console.log('📍 Current route:', route.path);
       console.log('🔑 Has token?', !!localStorage.getItem('provider_token'));
       
+      // Add event listeners
+      window.addEventListener('resize', handleResize);
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+      
       setTimeout(() => {
         if (shouldLoadData()) {
           loadDashboardData();
@@ -1138,6 +1191,13 @@ export default {
           loading.value = false;
         }
       }, 100);
+    });
+
+    // Cleanup
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     });
 
     // Watch for provider prop changes
@@ -1165,6 +1225,8 @@ export default {
       loadingNotifications,
       notificationError,
       unreadCount,
+      isMobile,
+      notificationsList,
       
       // Data
       bookings,
@@ -1204,6 +1266,7 @@ export default {
       
       // Notification Methods
       toggleNotifications,
+      closeNotifications,
       onNotificationBlur,
       markAsRead,
       markAllAsRead,
@@ -1221,11 +1284,74 @@ export default {
 </script>
 
 <style scoped>
-/* [ALL YOUR EXISTING STYLES REMAIN EXACTLY THE SAME] */
+/* ===== MAIN DASHBOARD STYLES ===== */
+.home-dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  position: relative;
+}
 
-/* Add these new notification styles to the end of your existing styles */
+/* Header Section */
+.dashboard-header {
+  background: linear-gradient(135deg, #6a8685 0%, #6d8582 100%);
+  color: white;
+  padding: 32px;
+  border-radius: 0 0 20px 20px;
+  margin-bottom: 24px;
+  position: relative;
+}
 
-/* Notification Container */
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome-section .title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #eceded, #f4f5fb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-section .subtitle {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.date-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.provider-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  position: relative;
+}
+
+/* ===== NOTIFICATION SYSTEM ===== */
 .notification-container {
   position: relative;
   display: inline-block;
@@ -1247,12 +1373,17 @@ export default {
   color: white;
   font-size: 1.2rem;
   backdrop-filter: blur(10px);
+  z-index: 100;
 }
 
 .notification-btn:hover {
   background: white;
   color: #5b6388;
   transform: translateY(-2px);
+}
+
+.notification-btn:active {
+  transform: scale(0.95);
 }
 
 /* Notification Badge */
@@ -1273,6 +1404,7 @@ export default {
   padding: 0 5px;
   border: 2px solid #5b6388;
   animation: pulse 2s infinite;
+  z-index: 101;
 }
 
 @keyframes pulse {
@@ -1281,7 +1413,19 @@ export default {
   100% { transform: scale(1); }
 }
 
-/* Notifications Dropdown */
+/* ===== NOTIFICATIONS DROPDOWN ===== */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Desktop Dropdown */
 .notifications-dropdown {
   position: absolute;
   top: calc(100% + 10px);
@@ -1292,20 +1436,64 @@ export default {
   border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   border: 1px solid #e2e8f0;
-  z-index: 1000;
+  z-index: 9999;
   overflow: hidden;
-  animation: slideDown 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Mobile Dropdown */
+.notifications-dropdown.mobile-dropdown {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 400px;
+  height: 80vh;
+  max-height: 600px;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  z-index: 99999;
+}
+
+/* Mobile Overlay */
+.notifications-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 9998;
+}
+
+/* Mobile Close Button */
+.btn-close-mobile {
+  display: none;
+}
+
+.notifications-dropdown.mobile-dropdown .btn-close-mobile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+}
+
+.btn-close-mobile:hover {
+  background: #2563eb;
 }
 
 /* Notifications Header */
@@ -1316,6 +1504,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   background: #f8fafc;
+  flex-shrink: 0;
 }
 
 .notifications-header h4 {
@@ -1344,6 +1533,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .btn-mark-all:hover {
@@ -1362,6 +1552,7 @@ export default {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .btn-refresh:hover {
@@ -1376,9 +1567,14 @@ export default {
 
 /* Notifications List */
 .notifications-list {
-  max-height: 350px;
+  flex: 1;
   overflow-y: auto;
   padding: 8px 0;
+  max-height: none;
+}
+
+.notifications-dropdown.mobile-dropdown .notifications-list {
+  max-height: calc(80vh - 150px);
 }
 
 /* Notification Item */
@@ -1390,6 +1586,7 @@ export default {
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
   position: relative;
+  cursor: pointer;
 }
 
 .notification-item.unread {
@@ -1397,12 +1594,12 @@ export default {
   border-left: 3px solid #3b82f6;
 }
 
-.notification-item.clickable {
-  cursor: pointer;
-}
-
 .notification-item.clickable:hover {
   background: #f8fafc;
+}
+
+.notification-item:active {
+  background: #f1f5f9;
 }
 
 .notification-item:last-child {
@@ -1503,6 +1700,7 @@ export default {
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .btn-action.mark-read {
@@ -1528,6 +1726,11 @@ export default {
   padding: 40px 20px;
   text-align: center;
   color: #94a3b8;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .notifications-empty i {
@@ -1547,6 +1750,7 @@ export default {
   border-top: 1px solid #e2e8f0;
   text-align: center;
   background: #f8fafc;
+  flex-shrink: 0;
 }
 
 .btn-view-all {
@@ -1571,104 +1775,7 @@ export default {
   border-color: #3b82f6;
 }
 
-/* Responsive Design for Notifications */
-@media (max-width: 768px) {
-  .notifications-dropdown {
-    width: 320px;
-    right: -50px;
-  }
-}
-
-@media (max-width: 480px) {
-  .notifications-dropdown {
-    width: 280px;
-    right: -80px;
-  }
-  
-  .notification-item {
-    padding: 12px 16px;
-  }
-  
-  .notifications-header {
-    padding: 12px 16px;
-  }
-  
-  .notifications-footer {
-    padding: 12px 16px;
-  }
-}
-
-/* Update header actions to include notification button */
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-/* [ALL YOUR EXISTING STYLES REMAIN EXACTLY THE SAME] */
-.home-dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-}
-
-/* Header Section */
-.dashboard-header {
-  background: linear-gradient(135deg, #6a8685 0%, #6d8582 100%);
-  color: white;
-  padding: 32px;
-  border-radius: 0 0 20px 20px;
-  margin-bottom: 24px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.welcome-section .title {
-  font-size: 2rem;
-  font-weight: 800;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #eceded, #f4f5fb);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.welcome-section .subtitle {
-  font-size: 1rem;
-  opacity: 0.9;
-  margin-bottom: 12px;
-}
-
-.date-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.8;
-  font-size: 0.9rem;
-}
-
-.provider-id {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 0.9rem;
-  opacity: 0.9;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-/* Buttons */
+/* ===== BUTTONS ===== */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -2101,7 +2208,9 @@ export default {
   to { transform: rotate(360deg); }
 }
 
-/* Responsive Design */
+/* ===== RESPONSIVE DESIGN ===== */
+
+/* Tablet */
 @media (max-width: 1024px) {
   .metrics-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -2112,14 +2221,24 @@ export default {
   }
 }
 
+/* Mobile */
 @media (max-width: 768px) {
   .dashboard-header {
-    padding: 24px;
+    padding: 20px;
   }
   
   .header-content {
     flex-direction: column;
     gap: 20px;
+  }
+  
+  .welcome-section .title {
+    font-size: 1.5rem;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
   
   .metrics-grid {
@@ -2138,11 +2257,31 @@ export default {
   .stat-item {
     text-align: left;
   }
-}
-
-@media (max-width: 480px) {
+  
   .dashboard-content {
     padding: 0 16px 24px;
+  }
+  
+  /* Mobile-specific notification styles */
+  .notifications-dropdown:not(.mobile-dropdown) {
+    right: -50px;
+    width: 320px;
+  }
+  
+  .notification-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .dashboard-header {
+    padding: 16px;
+  }
+  
+  .welcome-section .title {
+    font-size: 1.25rem;
   }
   
   .metric-card {
@@ -2156,8 +2295,73 @@ export default {
     height: 50px;
   }
   
+  .metric-content h3 {
+    font-size: 1.8rem;
+  }
+  
   .status-label {
     font-size: 0.7rem;
+  }
+  
+  /* Mobile notifications */
+  .notifications-dropdown:not(.mobile-dropdown) {
+    right: -80px;
+    width: 280px;
+  }
+  
+  .notification-item {
+    padding: 12px 16px;
+  }
+  
+  .notifications-header {
+    padding: 12px 16px;
+  }
+  
+  .notifications-footer {
+    padding: 12px 16px;
+  }
+  
+  .btn-mark-all {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+  
+  .notification-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra Small Mobile */
+@media (max-width: 360px) {
+  .notifications-dropdown:not(.mobile-dropdown) {
+    width: 260px;
+  }
+  
+  .notification-title {
+    font-size: 0.85rem;
+  }
+  
+  .notification-message {
+    font-size: 0.8rem;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .notification-item .notification-actions {
+    opacity: 1; /* Always show actions on touch devices */
+  }
+  
+  .btn-action {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  
+  .notification-item {
+    min-height: 60px; /* Better touch target */
   }
 }
 </style>
